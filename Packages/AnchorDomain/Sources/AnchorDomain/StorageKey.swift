@@ -14,7 +14,9 @@ public struct StorageKey: ValidatedRawValue, Hashable, CustomStringConvertible {
 
     public init?(rawValue: String) {
         guard !rawValue.isEmpty, rawValue.utf8.count <= Self.maximumLength else { return nil }
-        guard rawValue == rawValue.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        guard rawValue == rawValue.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
+        }
         guard !rawValue.hasPrefix("/") else { return nil }
         guard rawValue.unicodeScalars.allSatisfy(Self.isPermittedScalar) else { return nil }
 

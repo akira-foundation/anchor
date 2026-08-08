@@ -62,11 +62,23 @@ Dependencies point inward only. `AnchorDomain` depends on nothing but `AnchorFou
 
 ## Building and testing
 
-Open `Anchor.xcworkspace`, or run the full scaffold verification from the repository root:
+Open `Anchor.xcworkspace`, or run the full verification from the repository root:
 
 ```bash
 ./Scripts/verify-scaffold.sh
 ```
+
+Formatting is enforced by `swift format` against `.swift-format`:
+
+```bash
+./Scripts/format.sh
+```
+
+Pass `--lint` to check without rewriting, which is what CI runs.
+
+Every push to `main` and every pull request runs formatting, the nine package
+test suites in parallel, the dependency boundary check, and both application
+builds.
 
 ## Dependencies
 

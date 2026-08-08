@@ -21,6 +21,6 @@ let package = Package(
         .testTarget(
             name: "AnchorKnowledgeTests",
             dependencies: ["AnchorKnowledge"]
-        )
+        ),
     ]
 )

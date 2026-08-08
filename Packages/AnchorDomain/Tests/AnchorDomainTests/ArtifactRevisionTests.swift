@@ -96,7 +96,8 @@ struct ArtifactRevisionDecodingTests {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(
                 ArtifactRevision.self,
-                from: encodedRevision(id: revisionRawValue, parentRevisionID: revisionRawValue.lowercased())
+                from: encodedRevision(
+                    id: revisionRawValue, parentRevisionID: revisionRawValue.lowercased())
             )
         }
     }

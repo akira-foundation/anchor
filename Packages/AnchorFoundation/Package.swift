@@ -8,17 +8,15 @@ let package = Package(
     products: [
         .library(name: "AnchorFoundation", targets: ["AnchorFoundation"])
     ],
-    dependencies: [
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "AnchorFoundation",
-            dependencies: [
-            ]
+            dependencies: []
         ),
         .testTarget(
             name: "AnchorFoundationTests",
             dependencies: ["AnchorFoundation"]
-        )
+        ),
     ]
 )

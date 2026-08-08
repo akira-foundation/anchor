@@ -29,7 +29,8 @@ public struct ArtifactRevision: Sendable, Hashable, Codable, Identifiable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let decodedID = try container.decode(RevisionID.self, forKey: .id)
-        let decodedParentRevisionID = try container.decodeIfPresent(RevisionID.self, forKey: .parentRevisionID)
+        let decodedParentRevisionID = try container.decodeIfPresent(
+            RevisionID.self, forKey: .parentRevisionID)
 
         guard decodedParentRevisionID != decodedID else {
             throw DecodingError.dataCorruptedError(

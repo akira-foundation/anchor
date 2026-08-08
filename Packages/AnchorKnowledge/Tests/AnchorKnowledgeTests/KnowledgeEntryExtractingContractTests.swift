@@ -4,7 +4,8 @@ import Testing
 @testable import AnchorKnowledge
 
 private struct LineSplittingKnowledgeEntryExtractor: KnowledgeEntryExtracting {
-    func extractKnowledgeEntrySummaries(fromSourceText sourceText: String) async throws -> [String] {
+    func extractKnowledgeEntrySummaries(fromSourceText sourceText: String) async throws -> [String]
+    {
         sourceText
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -18,8 +19,10 @@ struct KnowledgeEntryExtractingContractTests {
     func sourceTextYieldsOneSummaryPerNonEmptyLine() async throws {
         let knowledgeEntryExtractor = LineSplittingKnowledgeEntryExtractor()
 
-        let extractedSummaries = try await knowledgeEntryExtractor
-            .extractKnowledgeEntrySummaries(fromSourceText: "decided on SQLite\n\n  deferred iCloud  ")
+        let extractedSummaries =
+            try await knowledgeEntryExtractor
+            .extractKnowledgeEntrySummaries(
+                fromSourceText: "decided on SQLite\n\n  deferred iCloud  ")
 
         #expect(extractedSummaries == ["decided on SQLite", "deferred iCloud"])
     }
@@ -28,6 +31,8 @@ struct KnowledgeEntryExtractingContractTests {
     func emptySourceTextYieldsNoSummaries() async throws {
         let knowledgeEntryExtractor = LineSplittingKnowledgeEntryExtractor()
 
-        #expect(try await knowledgeEntryExtractor.extractKnowledgeEntrySummaries(fromSourceText: "").isEmpty)
+        #expect(
+            try await knowledgeEntryExtractor.extractKnowledgeEntrySummaries(fromSourceText: "")
+                .isEmpty)
     }
 }

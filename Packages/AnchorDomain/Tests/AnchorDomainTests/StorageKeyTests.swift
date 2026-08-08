@@ -24,7 +24,9 @@ struct StorageKeyTests {
 
     @Test(
         "a key containing a parent directory segment is rejected",
-        arguments: ["../escaped", "projects/../../escaped", "projects/..", "..", "projects/../artifacts"]
+        arguments: [
+            "../escaped", "projects/../../escaped", "projects/..", "..", "projects/../artifacts",
+        ]
     )
     func keyContainingAParentDirectorySegmentIsRejected(_ rawValue: String) {
         #expect(StorageKey(rawValue: rawValue) == nil)
@@ -47,7 +49,10 @@ struct StorageKeyTests {
 struct StorageKeyHostileInputTests {
     @Test(
         "a key that is rejected on construction is also rejected on decoding",
-        arguments: ["../escaped", "/absolute", " /etc/passwd", ".", "./secret", "a//b", "", "back\\slash", "%2e%2e/x"]
+        arguments: [
+            "../escaped", "/absolute", " /etc/passwd", ".", "./secret", "a//b", "", "back\\slash",
+            "%2e%2e/x",
+        ]
     )
     func keyRejectedOnConstructionIsAlsoRejectedOnDecoding(_ rawValue: String) throws {
         #expect(StorageKey(rawValue: rawValue) == nil)
@@ -98,7 +103,12 @@ struct StorageKeyHostileInputTests {
 
     @Test("a key longer than the maximum length is rejected")
     func keyLongerThanTheMaximumLengthIsRejected() throws {
-        #expect(try #require(StorageKey(rawValue: String(repeating: "a", count: StorageKey.maximumLength))) != nil)
-        #expect(StorageKey(rawValue: String(repeating: "a", count: StorageKey.maximumLength + 1)) == nil)
+        #expect(
+            try #require(
+                StorageKey(rawValue: String(repeating: "a", count: StorageKey.maximumLength)))
+                != nil)
+        #expect(
+            StorageKey(rawValue: String(repeating: "a", count: StorageKey.maximumLength + 1)) == nil
+        )
     }
 }

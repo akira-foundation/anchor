@@ -7,7 +7,10 @@ public struct AgentSession: Sendable, Hashable, Codable, Identifiable {
     public let startedAt: Date
     public let updatedAt: Date
 
-    public init(id: SessionID, projectID: ProjectID, provider: AgentProvider, startedAt: Date, updatedAt: Date) {
+    public init(
+        id: SessionID, projectID: ProjectID, provider: AgentProvider, startedAt: Date,
+        updatedAt: Date
+    ) {
         self.id = id
         self.projectID = projectID
         self.provider = provider

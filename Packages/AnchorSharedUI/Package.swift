@@ -21,6 +21,6 @@ let package = Package(
         .testTarget(
             name: "AnchorSharedUITests",
             dependencies: ["AnchorSharedUI"]
-        )
+        ),
     ]
 )

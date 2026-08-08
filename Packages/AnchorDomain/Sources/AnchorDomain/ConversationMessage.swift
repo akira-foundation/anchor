@@ -7,7 +7,10 @@ public struct ConversationMessage: Sendable, Hashable, Codable, Identifiable {
     public let content: String
     public let timestamp: Date
 
-    public init(id: MessageID, sessionID: SessionID, role: ConversationRole, content: String, timestamp: Date) {
+    public init(
+        id: MessageID, sessionID: SessionID, role: ConversationRole, content: String,
+        timestamp: Date
+    ) {
         self.id = id
         self.sessionID = sessionID
         self.role = role

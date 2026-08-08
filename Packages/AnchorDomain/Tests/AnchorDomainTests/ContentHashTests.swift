@@ -60,7 +60,8 @@ struct ContentHashHostileInputTests {
 
     @Test("a valid digest survives an encode and decode round trip")
     func validDigestSurvivesAnEncodeAndDecodeRoundTrip() throws {
-        let contentHash = try #require(ContentHash(rawValue: String(repeating: "a1b2c3d4", count: 8)))
+        let contentHash = try #require(
+            ContentHash(rawValue: String(repeating: "a1b2c3d4", count: 8)))
 
         let encodedDigest = try JSONEncoder().encode(contentHash)
         let decodedDigest = try JSONDecoder().decode(ContentHash.self, from: encodedDigest)

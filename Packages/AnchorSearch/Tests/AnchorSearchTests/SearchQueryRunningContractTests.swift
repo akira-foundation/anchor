@@ -20,7 +20,8 @@ struct SearchQueryRunningContractTests {
             matchingArtifactIDsByQueryText: ["composition root": [expectedArtifactID]]
         )
 
-        let matchingArtifactIDs = try await searchQueryRunner
+        let matchingArtifactIDs =
+            try await searchQueryRunner
             .findMatchingArtifactIDs(forQueryText: "composition root")
 
         #expect(matchingArtifactIDs == [expectedArtifactID])

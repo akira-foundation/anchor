@@ -36,7 +36,9 @@ struct DomainCodableTests {
     @Test("a workspace without a local repository survives an encode and decode round trip")
     func workspaceWithoutALocalRepositorySurvivesAnEncodeAndDecodeRoundTrip() throws {
         try assertRoundTrip(
-            Workspace(id: WorkspaceID(), projectID: ProjectID(), deviceID: DeviceID(), localRepositoryURL: nil)
+            Workspace(
+                id: WorkspaceID(), projectID: ProjectID(), deviceID: DeviceID(),
+                localRepositoryURL: nil)
         )
     }
 

@@ -55,6 +55,8 @@ AnchorFoundation
 
 Dependencies point inward only. `AnchorDomain` depends on nothing but `AnchorFoundation` and imports no UI framework.
 
+`AnchorStorage` and `AnchorPersistence` each vend a second product, `AnchorStorageTestSupport` and `AnchorPersistenceTestSupport`, holding reusable conformance suites for their contracts. They import the testing framework, so an application target must never link them. CI enforces both halves of that rule.
+
 ## Requirements
 
 - Xcode 26.6 or later

@@ -5,39 +5,49 @@ import Foundation
 import Testing
 
 actor InMemoryStorageProvider: StorageProvider {
-    private var storedObjectsByKey: [StorageKey: StorageObject] = [:]
-    private var metadataByKey: [StorageKey: StorageObjectMetadata] = [:]
+    private var storedObjectsByKey: [StorageKey: StoredObject] = [:]
+    private var recordedChanges: [StorageChange] = []
+    private var observerContinuations:
+        [Int: AsyncThrowingStream<StorageChange, any Error>.Continuation] = [:]
     private var writeSequenceNumber = 0
+    private var observerSequenceNumber = 0
 
-    func putObject(_ storageObject: StorageObject) async throws(StorageFailure) {
-        let existingMetadata = metadataByKey[storageObject.key]
+    @discardableResult
+    func putObject(
+        _ storageObject: StorageObject, precondition: StorageWritePrecondition
+    )
+        async throws(StorageFailure) -> StorageObjectMetadata
+    {
+        let existingMetadata = storedObjectsByKey[storageObject.key]?.metadata
 
-        if let expectedVersionTag = storageObject.expectedVersionTag {
-            guard existingMetadata?.versionTag == expectedVersionTag else {
-                throw .versionConflict(storageObject.key)
-            }
-        }
+        try verifyPrecondition(precondition, for: storageObject.key, against: existingMetadata)
 
         writeSequenceNumber += 1
-        storedObjectsByKey[storageObject.key] = storageObject
-        metadataByKey[storageObject.key] = StorageObjectMetadata(
+
+        let writtenMetadata = StorageObjectMetadata(
             key: storageObject.key,
             byteSize: storageObject.contents.count,
             modifiedAt: Date(timeIntervalSince1970: TimeInterval(writeSequenceNumber)),
             versionTag: StorageVersionTag(rawValue: String(writeSequenceNumber))
         )
+
+        storedObjectsByKey[storageObject.key] = StoredObject(
+            object: storageObject,
+            metadata: writtenMetadata
+        )
+        recordChange(key: storageObject.key, kind: existingMetadata == nil ? .created : .updated)
+
+        return writtenMetadata
     }
 
-    func object(for key: StorageKey) async throws(StorageFailure) -> StorageObject? {
+    func object(for key: StorageKey) async throws(StorageFailure) -> StoredObject? {
         storedObjectsByKey[key]
     }
 
     func deleteObject(for key: StorageKey) async throws(StorageFailure) {
-        guard storedObjectsByKey.removeValue(forKey: key) != nil else {
-            throw .objectNotFound(key)
-        }
+        guard storedObjectsByKey.removeValue(forKey: key) != nil else { return }
 
-        metadataByKey.removeValue(forKey: key)
+        recordChange(key: key, kind: .deleted)
     }
 
     func listObjects(
@@ -45,8 +55,9 @@ actor InMemoryStorageProvider: StorageProvider {
     ) async throws(StorageFailure)
         -> [StorageObjectMetadata]
     {
-        metadataByKey.values
-            .filter { prefix.map { $0.rawValue }.map($0.key.rawValue.hasPrefix) ?? true }
+        storedObjectsByKey.values
+            .map(\.metadata)
+            .filter { metadata in prefix.map(metadata.key.isWithin) ?? true }
             .sorted { $0.key.rawValue < $1.key.rawValue }
     }
 
@@ -55,9 +66,56 @@ actor InMemoryStorageProvider: StorageProvider {
     )
         -> AsyncThrowingStream<StorageChange, any Error>
     {
-        AsyncThrowingStream { $0.finish() }
+        AsyncThrowingStream { continuation in
+            let registration = Task {
+                await self.startObserving(continuation, after: cursor)
+            }
+
+            continuation.onTermination = { _ in registration.cancel() }
+        }
     }
 
+    private func verifyPrecondition(
+        _ precondition: StorageWritePrecondition,
+        for key: StorageKey,
+        against existingMetadata: StorageObjectMetadata?
+    ) throws(StorageFailure) {
+        switch precondition {
+        case .none:
+            return
+        case .objectIsAbsent:
+            guard existingMetadata != nil else { return }
+
+            throw .preconditionFailed(key, currentVersionTag: existingMetadata?.versionTag)
+        case .versionTagMatches(let expectedVersionTag):
+            guard existingMetadata?.versionTag != expectedVersionTag else { return }
+
+            throw .preconditionFailed(key, currentVersionTag: existingMetadata?.versionTag)
+        }
+    }
+
+    private func recordChange(key: StorageKey, kind: StorageChangeKind) {
+        let change = StorageChange(
+            key: key,
+            kind: kind,
+            cursor: StorageCursor(rawValue: String(recordedChanges.count + 1))
+        )
+
+        recordedChanges.append(change)
+        observerContinuations.values.forEach { $0.yield(change) }
+    }
+
+    private func startObserving(
+        _ continuation: AsyncThrowingStream<StorageChange, any Error>.Continuation,
+        after cursor: StorageCursor?
+    ) {
+        let replayStartIndex = cursor.flatMap { Int($0.rawValue) } ?? 0
+
+        recordedChanges.dropFirst(replayStartIndex).forEach { continuation.yield($0) }
+
+        observerSequenceNumber += 1
+        observerContinuations[observerSequenceNumber] = continuation
+    }
 }
 
 @Suite("InMemoryStorageProvider conforms to the StorageProvider contract")

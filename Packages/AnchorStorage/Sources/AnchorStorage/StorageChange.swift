@@ -1,6 +1,6 @@
 import AnchorDomain
 
-public struct StorageChange: Sendable, Hashable {
+public struct StorageChange: Sendable, Hashable, Codable {
     public let key: StorageKey
     public let kind: StorageChangeKind
     public let cursor: StorageCursor

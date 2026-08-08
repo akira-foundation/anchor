@@ -4,32 +4,32 @@ import Testing
 @testable import AnchorSearch
 
 private struct StaticSearchQueryRunner: SearchQueryRunning {
-    let matchingArtifactIdentifiersByQueryText: [String: [ArtifactIdentifier]]
+    let matchingArtifactIDsByQueryText: [String: [ArtifactID]]
 
-    func findMatchingArtifactIdentifiers(forQueryText queryText: String) async throws -> [ArtifactIdentifier] {
-        matchingArtifactIdentifiersByQueryText[queryText] ?? []
+    func findMatchingArtifactIDs(forQueryText queryText: String) async throws -> [ArtifactID] {
+        matchingArtifactIDsByQueryText[queryText] ?? []
     }
 }
 
 @Suite("SearchQueryRunning contract")
 struct SearchQueryRunningContractTests {
     @Test("a query with matches returns the matching artifact identifiers")
-    func queryWithMatchesReturnsTheMatchingArtifactIdentifiers() async throws {
-        let expectedArtifactIdentifier = ArtifactIdentifier()
+    func queryWithMatchesReturnsTheMatchingArtifactIDs() async throws {
+        let expectedArtifactID = ArtifactID()
         let searchQueryRunner = StaticSearchQueryRunner(
-            matchingArtifactIdentifiersByQueryText: ["composition root": [expectedArtifactIdentifier]]
+            matchingArtifactIDsByQueryText: ["composition root": [expectedArtifactID]]
         )
 
-        let matchingArtifactIdentifiers = try await searchQueryRunner
-            .findMatchingArtifactIdentifiers(forQueryText: "composition root")
+        let matchingArtifactIDs = try await searchQueryRunner
+            .findMatchingArtifactIDs(forQueryText: "composition root")
 
-        #expect(matchingArtifactIdentifiers == [expectedArtifactIdentifier])
+        #expect(matchingArtifactIDs == [expectedArtifactID])
     }
 
     @Test("a query without matches returns no artifact identifiers")
-    func queryWithoutMatchesReturnsNoArtifactIdentifiers() async throws {
-        let searchQueryRunner = StaticSearchQueryRunner(matchingArtifactIdentifiersByQueryText: [:])
+    func queryWithoutMatchesReturnsNoArtifactIDs() async throws {
+        let searchQueryRunner = StaticSearchQueryRunner(matchingArtifactIDsByQueryText: [:])
 
-        #expect(try await searchQueryRunner.findMatchingArtifactIdentifiers(forQueryText: "absent").isEmpty)
+        #expect(try await searchQueryRunner.findMatchingArtifactIDs(forQueryText: "absent").isEmpty)
     }
 }

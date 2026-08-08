@@ -1,6 +1,8 @@
 import Foundation
 
-public struct Identifier<Subject>: Sendable, Hashable, CustomStringConvertible {
+public struct Identifier<Subject>: ValidatedRawValue, Hashable, CustomStringConvertible {
+    public static var rawValueRequirement: String { "Identifier raw value is not a UUID" }
+
     public let rawValue: String
 
     public init() {
@@ -8,9 +10,9 @@ public struct Identifier<Subject>: Sendable, Hashable, CustomStringConvertible {
     }
 
     public init?(rawValue: String) {
-        guard UUID(uuidString: rawValue) != nil else { return nil }
+        guard let parsedUniversallyUniqueIdentifier = UUID(uuidString: rawValue) else { return nil }
 
-        self.rawValue = rawValue
+        self.rawValue = parsedUniversallyUniqueIdentifier.uuidString
     }
 
     public var description: String { rawValue }

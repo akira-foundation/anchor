@@ -1,0 +1,34 @@
+## macOS
+.DS_Store
+
+## Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+## Superpowers / Graphify / AI planning artifacts: local-only, never committed
+.superpowers/
+graphify-out/
+graphify/
+docs/superpowers/
+Docs/superpowers/
+**/brainstorm/
+**/brainstorms/
+**/plans/
+**/specs/
+server.pid
+server-info
+.last-port
+.last-token

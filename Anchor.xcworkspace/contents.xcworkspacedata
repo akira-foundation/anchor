@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <Group
+      location = "container:Apps"
+      name = "Apps">
+      <FileRef
+         location = "group:AnchorMac/AnchorMac.xcodeproj">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorMobile/AnchorMobile.xcodeproj">
+      </FileRef>
+   </Group>
+   <Group
+      location = "container:Packages"
+      name = "Packages">
+      <FileRef
+         location = "group:AnchorFoundation">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorDomain">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorApplication">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorPersistence">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorStorage">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorSync">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorSearch">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorKnowledge">
+      </FileRef>
+      <FileRef
+         location = "group:AnchorSharedUI">
+      </FileRef>
+   </Group>
+</Workspace>

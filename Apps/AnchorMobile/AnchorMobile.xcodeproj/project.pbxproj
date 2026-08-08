@@ -1,0 +1,293 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4D334C8864CD590B709769D6 /* AnchorSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = 08083B3212C88EBF10CD87F7 /* AnchorSharedUI */; };
+		8010346ACFB0F0C86FC78823 /* AnchorApplication in Frameworks */ = {isa = PBXBuildFile; productRef = 5CAB57FD6EEF41D6E7488228 /* AnchorApplication */; };
+		7650398E4C1CC076CA746A4D /* AnchorDomain in Frameworks */ = {isa = PBXBuildFile; productRef = EE5D82B63A7520003D75889C /* AnchorDomain */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		D88678E278686820A0EE54FD /* AnchorMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AnchorMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		E090DCB8CBAA3CCC5173FB80 /* AnchorMobile */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AnchorMobile;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		21C9E53D9EA37551AD1600A0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D334C8864CD590B709769D6 /* AnchorSharedUI in Frameworks */,
+				8010346ACFB0F0C86FC78823 /* AnchorApplication in Frameworks */,
+				7650398E4C1CC076CA746A4D /* AnchorDomain in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A21A1D32A796CA7E1AF7DD1B = {
+			isa = PBXGroup;
+			children = (
+				E090DCB8CBAA3CCC5173FB80 /* AnchorMobile */,
+				A8E2B7A9840FECA018306702 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A8E2B7A9840FECA018306702 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D88678E278686820A0EE54FD /* AnchorMobile.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F0830E681C726EF4B5EA2DF0 /* AnchorMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A04E6C4C0944396911ADB345 /* Build configuration list for PBXNativeTarget "AnchorMobile" */;
+			buildPhases = (
+				38A3FE0DB1CF8C07AB230C86 /* Sources */,
+				21C9E53D9EA37551AD1600A0 /* Frameworks */,
+				247A9097E3045A5E3089710F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E090DCB8CBAA3CCC5173FB80 /* AnchorMobile */,
+			);
+			name = AnchorMobile;
+			packageProductDependencies = (
+				08083B3212C88EBF10CD87F7 /* AnchorSharedUI */,
+				5CAB57FD6EEF41D6E7488228 /* AnchorApplication */,
+				EE5D82B63A7520003D75889C /* AnchorDomain */,
+			);
+			productName = AnchorMobile;
+			productReference = D88678E278686820A0EE54FD /* AnchorMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		696FF06FACD5DC13C221CDD3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					F0830E681C726EF4B5EA2DF0 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = B38C7842B7C65D61C319861C /* Build configuration list for PBXProject "AnchorMobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A21A1D32A796CA7E1AF7DD1B;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FFE9706E76FA0519583893FB /* XCLocalSwiftPackageReference "../../Packages/AnchorSharedUI" */,
+				2B2DC40E02EE7B6069EB1D2A /* XCLocalSwiftPackageReference "../../Packages/AnchorApplication" */,
+				10D108080B26CFA550A1ED06 /* XCLocalSwiftPackageReference "../../Packages/AnchorDomain" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A8E2B7A9840FECA018306702 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F0830E681C726EF4B5EA2DF0 /* AnchorMobile */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		247A9097E3045A5E3089710F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		38A3FE0DB1CF8C07AB230C86 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0D2DA749E634E66F4C4EAE91 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		AAFB5E751468C1FC6712FD79 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		65C26FA949F423E730FACEB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akira.anchor.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1D70EF8C1F9B346E4E771A27 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akira.anchor.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B38C7842B7C65D61C319861C /* Build configuration list for PBXProject "AnchorMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0D2DA749E634E66F4C4EAE91 /* Debug */,
+				AAFB5E751468C1FC6712FD79 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A04E6C4C0944396911ADB345 /* Build configuration list for PBXNativeTarget "AnchorMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65C26FA949F423E730FACEB2 /* Debug */,
+				1D70EF8C1F9B346E4E771A27 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		FFE9706E76FA0519583893FB /* XCLocalSwiftPackageReference "../../Packages/AnchorSharedUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorSharedUI;
+		};
+		2B2DC40E02EE7B6069EB1D2A /* XCLocalSwiftPackageReference "../../Packages/AnchorApplication" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorApplication;
+		};
+		10D108080B26CFA550A1ED06 /* XCLocalSwiftPackageReference "../../Packages/AnchorDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorDomain;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		08083B3212C88EBF10CD87F7 /* AnchorSharedUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorSharedUI;
+		};
+		5CAB57FD6EEF41D6E7488228 /* AnchorApplication */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorApplication;
+		};
+		EE5D82B63A7520003D75889C /* AnchorDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorDomain;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 696FF06FACD5DC13C221CDD3 /* Project object */;
+}

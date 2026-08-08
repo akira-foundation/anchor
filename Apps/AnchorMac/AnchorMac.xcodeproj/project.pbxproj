@@ -1,0 +1,287 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */; };
+		0DEF1A5D797C01F91DC388A5 /* AnchorApplication in Frameworks */ = {isa = PBXBuildFile; productRef = 59805980382456837F9B6139 /* AnchorApplication */; };
+		78DC081338680594E1295736 /* AnchorDomain in Frameworks */ = {isa = PBXBuildFile; productRef = BCC0FA34B0F73080723901A0 /* AnchorDomain */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AnchorMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1F8D3D29BE3A06E20BF15766 /* AnchorMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AnchorMac;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FDCB4BDB250BEC4A38144233 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */,
+				0DEF1A5D797C01F91DC388A5 /* AnchorApplication in Frameworks */,
+				78DC081338680594E1295736 /* AnchorDomain in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6E3EB1F6C41F9994A8D32358 = {
+			isa = PBXGroup;
+			children = (
+				1F8D3D29BE3A06E20BF15766 /* AnchorMac */,
+				0C1453DE0237AB3065FD4CB1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0C1453DE0237AB3065FD4CB1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C03A415FDA2AAD117FA48686 /* AnchorMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 27510C4AE975A1B7BE166AD3 /* Build configuration list for PBXNativeTarget "AnchorMac" */;
+			buildPhases = (
+				9B911746492F6BAF77BFBA79 /* Sources */,
+				FDCB4BDB250BEC4A38144233 /* Frameworks */,
+				5D0E629DA2B74231AADD31D5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1F8D3D29BE3A06E20BF15766 /* AnchorMac */,
+			);
+			name = AnchorMac;
+			packageProductDependencies = (
+				F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */,
+				59805980382456837F9B6139 /* AnchorApplication */,
+				BCC0FA34B0F73080723901A0 /* AnchorDomain */,
+			);
+			productName = AnchorMac;
+			productReference = 4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		772232515AF78FB045C23CB9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					C03A415FDA2AAD117FA48686 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = 549FF98C8F21A1E525236643 /* Build configuration list for PBXProject "AnchorMac" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6E3EB1F6C41F9994A8D32358;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				455B8E31530B84BF6C9CB103 /* XCLocalSwiftPackageReference "../../Packages/AnchorSharedUI" */,
+				C071F4A09ED43C5BC365162A /* XCLocalSwiftPackageReference "../../Packages/AnchorApplication" */,
+				8C4BACA83B978244E95B2A42 /* XCLocalSwiftPackageReference "../../Packages/AnchorDomain" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0C1453DE0237AB3065FD4CB1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C03A415FDA2AAD117FA48686 /* AnchorMac */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5D0E629DA2B74231AADD31D5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9B911746492F6BAF77BFBA79 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FD0259B61859CCD1C2D038C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		A9F2B40DD7491DE0834B722E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		D6A8D45D88F3714952F98482 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akira.anchor.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		21CDA62BEECAB53F3781D59F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akira.anchor.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		549FF98C8F21A1E525236643 /* Build configuration list for PBXProject "AnchorMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FD0259B61859CCD1C2D038C9 /* Debug */,
+				A9F2B40DD7491DE0834B722E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		27510C4AE975A1B7BE166AD3 /* Build configuration list for PBXNativeTarget "AnchorMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6A8D45D88F3714952F98482 /* Debug */,
+				21CDA62BEECAB53F3781D59F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		455B8E31530B84BF6C9CB103 /* XCLocalSwiftPackageReference "../../Packages/AnchorSharedUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorSharedUI;
+		};
+		C071F4A09ED43C5BC365162A /* XCLocalSwiftPackageReference "../../Packages/AnchorApplication" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorApplication;
+		};
+		8C4BACA83B978244E95B2A42 /* XCLocalSwiftPackageReference "../../Packages/AnchorDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorDomain;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorSharedUI;
+		};
+		59805980382456837F9B6139 /* AnchorApplication */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorApplication;
+		};
+		BCC0FA34B0F73080723901A0 /* AnchorDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorDomain;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 772232515AF78FB045C23CB9 /* Project object */;
+}

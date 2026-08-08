@@ -1,5 +1,5 @@
 import AnchorDomain
 
 public protocol SearchQueryRunning: Sendable {
-    func findMatchingArtifactIdentifiers(forQueryText queryText: String) async throws -> [ArtifactIdentifier]
+    func findMatchingArtifactIDs(forQueryText queryText: String) async throws -> [ArtifactID]
 }

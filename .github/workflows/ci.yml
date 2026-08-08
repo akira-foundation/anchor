@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  format:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$latest" ]; then sudo xcode-select -switch "$latest"; fi
+          swift --version
+      - name: Check formatting
+        run: bash Scripts/format.sh --lint
+
+  test:
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - AnchorFoundation
+          - AnchorDomain
+          - AnchorApplication
+          - AnchorPersistence
+          - AnchorStorage
+          - AnchorSync
+          - AnchorSearch
+          - AnchorKnowledge
+          - AnchorSharedUI
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$latest" ]; then sudo xcode-select -switch "$latest"; fi
+          swift --version
+      - name: Run package tests
+        working-directory: Packages/${{ matrix.package }}
+        run: swift test --arch arm64
+
+  boundaries:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Reject a UI framework import in AnchorDomain
+        run: |
+          if grep -rlE '^import (SwiftUI|UIKit|AppKit)$' Packages/AnchorDomain/Sources; then
+            echo "AnchorDomain imports a UI framework" >&2
+            exit 1
+          fi
+
+  build:
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scheme: AnchorMac
+            destination: platform=macOS,arch=arm64
+          - scheme: AnchorMobile
+            destination: generic/platform=iOS Simulator
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$latest" ]; then sudo xcode-select -switch "$latest"; fi
+          xcodebuild -version
+      - name: Build ${{ matrix.scheme }}
+        run: |
+          xcodebuild build \
+            -workspace Anchor.xcworkspace \
+            -scheme ${{ matrix.scheme }} \
+            -destination '${{ matrix.destination }}' \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet

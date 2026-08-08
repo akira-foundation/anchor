@@ -3,9 +3,9 @@ import Testing
 
 @testable import AnchorApplication
 
-private struct EchoProjectIdentifierAction: Action {
-    func perform(_ projectIdentifier: ProjectIdentifier) async throws -> ProjectIdentifier {
-        projectIdentifier
+private struct EchoProjectIDAction: Action {
+    func perform(_ projectID: ProjectID) async throws -> ProjectID {
+        projectID
     }
 }
 
@@ -13,11 +13,11 @@ private struct EchoProjectIdentifierAction: Action {
 struct ActionContractTests {
     @Test("an action returns the output produced from its input")
     func actionReturnsTheOutputProducedFromItsInput() async throws {
-        let expectedProjectIdentifier = ProjectIdentifier()
-        let echoAction = EchoProjectIdentifierAction()
+        let expectedProjectID = ProjectID()
+        let echoAction = EchoProjectIDAction()
 
-        let returnedProjectIdentifier = try await echoAction.perform(expectedProjectIdentifier)
+        let returnedProjectID = try await echoAction.perform(expectedProjectID)
 
-        #expect(returnedProjectIdentifier == expectedProjectIdentifier)
+        #expect(returnedProjectID == expectedProjectID)
     }
 }

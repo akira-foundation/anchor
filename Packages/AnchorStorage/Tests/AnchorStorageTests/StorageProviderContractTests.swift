@@ -26,9 +26,12 @@ struct StorageProviderContractTests {
         let expectedStoredData = Data("anchor".utf8)
         let storageProvider = InMemoryStorageProvider()
 
-        try await storageProvider.writeStoredData(expectedStoredData, toRelativePath: "projects/index")
+        try await storageProvider.writeStoredData(
+            expectedStoredData, toRelativePath: "projects/index")
 
-        #expect(try await storageProvider.readStoredData(atRelativePath: "projects/index") == expectedStoredData)
+        #expect(
+            try await storageProvider.readStoredData(atRelativePath: "projects/index")
+                == expectedStoredData)
     }
 
     @Test("reading an absent relative path reports the missing path")

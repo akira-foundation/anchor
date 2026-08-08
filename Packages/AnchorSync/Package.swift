@@ -10,19 +10,19 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../AnchorDomain"),
-        .package(path: "../AnchorApplication")
+        .package(path: "../AnchorApplication"),
     ],
     targets: [
         .target(
             name: "AnchorSync",
             dependencies: [
                 .product(name: "AnchorDomain", package: "AnchorDomain"),
-                .product(name: "AnchorApplication", package: "AnchorApplication")
+                .product(name: "AnchorApplication", package: "AnchorApplication"),
             ]
         ),
         .testTarget(
             name: "AnchorSyncTests",
             dependencies: ["AnchorSync"]
-        )
+        ),
     ]
 )

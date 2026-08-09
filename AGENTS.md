@@ -92,4 +92,143 @@ If the behavior of an external system is unknown, investigate it before implemen
 - No automatic architectural changes. A deviation from the agreed architecture is proposed and approved before it is written.
 - No automatic commits, pushes, or pull requests. The user decides when work is committed.
 - No new third-party dependency without explicit approval.
-- Never commit Superpowers, Graphify, brainstorm, plan, spec, or AI context artifacts. They are ignored in `.gitignore` and must never be force-added. Verify staged paths with `git diff --cached --name-only` before committing.
+- Never commit Superpowers, Graphify, brainstorm, plan, spec, or AI context artifacts. They are ignored in `.gitignore` and must never be force-added. Verify what is about to be committed first: `jj diff --name-only` under jujutsu, `git diff --cached --name-only` under git. Using the wrong one reports an empty set rather than an error, so the check passes while the artifacts go through.
+
+<!-- init-jj:start -->
+
+## Version Control: Jujutsu
+
+This repository uses Jujutsu (`jj`) as the primary local VCS interface for
+agents. Git remains the backend: remotes, GitHub, CI and external Git tooling
+all keep working against the same `.git` directory.
+
+    local agent interface = jj
+    backend and interoperability = git
+
+Detection is automatic. `jj root` succeeding means jujutsu, even though `.git`
+is also present, because a colocated repository always carries both, and its index is
+not the change `jj` commits.
+
+### Use jj for local work
+
+Inspect with `jj status`, `jj diff`, `jj log`.
+
+Rewrite local history with `jj split`, `jj squash`, `jj rebase`, `jj edit`,
+`jj abandon`.
+
+Do not reach for the Git equivalents `git rebase`, `git commit --amend`,
+`git reset`. They rewrite the same commits from the other side, and the two
+views then disagree. Do not mix the two in one piece of work.
+
+Reaching for Git out of habit is the failure to watch for, because in a
+colocated repository the Git command usually succeeds and simply answers
+about the wrong thing. Every inspection has a jj form:
+
+    git status                  ->  jj status
+    git diff                    ->  jj diff
+    git diff --cached           ->  jj diff          (jj writes no index)
+    git diff --name-only        ->  jj diff --name-only
+    git log                     ->  jj log
+    git rev-parse --short HEAD  ->  jj log -r @- --no-graph -T 'commit_id.short(7)'
+    git branch                  ->  jj bookmark list
+    git ls-remote origin        ->  jj bookmark list --all-remotes
+    git fetch                   ->  jj git fetch
+    git push                    ->  jj git push
+
+The index queries are the dangerous ones. `git diff --cached` under jujutsu
+returns an empty set rather than an error, because jj never writes the index.
+Any check built on it reports success while missing everything, which is the
+worst way for a safety check to fail.
+
+### Identity must be configured before the first commit
+
+A fresh jj installation has no user name or email, and a repository
+initialized before they are set produces commits with an empty identity that
+no remote will accept. The failure appears at push time, long after the
+commit.
+
+    jj config get user.name
+    jj config get user.email
+
+If either is missing, set them from the Git identity the repository already
+uses, then repair any commit already made with the empty one:
+
+    jj config set --user user.name "<name>"
+    jj config set --user user.email "<email>"
+    jj metaedit --update-author -r <revision>
+
+Setting the config alone does not fix commits that already exist. jj says so
+when it happens; the repair is the second step.
+
+### Every finalized commit
+
+Inspect `jj status` and `jj diff` before finalizing. If the working-copy
+change covers more than one concern, `jj split` it first: one logical concern
+per commit, independently understandable, reviewable and revertible.
+
+Finalize with `jj commit -m "<message>"`. There is no separate wrapper
+command: commit-guard gates `jj commit`, `jj describe` and `jj squash`
+directly, so a failed validation stops the commit. `jj split` is deliberately
+left open, because splitting is how a non-atomic change gets fixed.
+
+Messages follow Conventional Commits:
+
+    feat(storage): add the iCloud storage driver
+    fix(sync): prevent duplicate synchronization
+    feat(api)!: replace the authentication contract
+
+A breaking change MUST carry `!` before the colon. A `BREAKING CHANGE:` footer
+may explain the break; it does not declare one. Semver reads the subject:
+
+    fix   -> PATCH
+    feat  -> MINOR
+    !     -> MAJOR   (outranks the type)
+
+### Bookmarks are not branches
+
+A Git branch follows you: commit, and it advances. A jj bookmark does not. It
+is a named pointer at one commit, and it stays there until it is moved by
+hand.
+
+    jj bookmark create <name> -r @-      create at the last finalized commit
+    jj bookmark move <name> --to @-      move it forward after committing again
+    jj git push --bookmark <name>        publish it
+    jj bookmark list --all-remotes       see local, @git and @origin at once
+
+Point a bookmark at `@-`, not `@`. The working copy `@` is itself a commit,
+usually empty and undescribed, so a bookmark on `@` publishes that empty
+commit instead of the work.
+
+This is the mistake to expect from anyone arriving from Git: finalize three
+changes, push, and discover only the first one went, because the bookmark
+never moved. After every `jj commit` that should end up on a published
+bookmark, move the bookmark before pushing, or use:
+
+    jj git push --change @-
+
+which derives the bookmark from the change id and publishes in one step.
+
+Bookmarks are ordinary Git refs in a colocated repository, so any Git-side
+branch convention the repository already enforces keeps working unchanged.
+Only the command that creates them differs.
+
+### Pull requests
+
+Jujutsu has no pull request command. `jj git` covers clone, colocation,
+export, fetch, import, init, push, remote and root, and nothing more: a pull
+request is a forge concept, not a VCS one.
+
+Publish the bookmark with `jj git push`, then open the request with the forge
+CLI, `gh` for GitHub. Everything up to that point stays in jj.
+
+### Never
+
+Never bypass validation: no `--no-verify`, no disabled tests, no suppressed
+failures, no hand-written commit-guard marker, no re-running a blocked command
+unchanged.
+
+Never push without the validation this repository requires.
+
+Commits, pushes, bookmarks, branches and pull requests still require explicit
+user authorization, exactly as before.
+<!-- init-jj:end -->

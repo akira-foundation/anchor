@@ -215,24 +215,31 @@ Only the command that creates them differs.
 ### Track the trunk once, or it never follows the remote
 
 The same standing-still rule applies to the trunk, and it bites harder because
-it is silent. `jj git init` prints a hint that the remote bookmark is not
-associated with a local one, and a repository left that way never advances its
-local trunk:
+it is silent.
+
+The trap belongs to `jj git init --colocate` over a repository that already
+has a remote, which is how an existing project adopts jujutsu. It prints a
+hint that the remote bookmark has no local counterpart and does nothing about
+it. `jj git clone` tracks on its own and is unaffected.
+
+Left untracked, the local trunk never advances:
 
     main: ksrmrvtt 957eaa0d          (empty) Merge pull request #2
     main@origin: xyuyytqs fc45dde4   (empty) Merge pull request #3
 
-After a fetch, `main@origin` carries the merge that just landed and `main`
-still points at the previous one. Nothing errors. Work started from the local
-trunk is silently based on a stale commit.
+The listing shows it: an untracked remote bookmark sits at the left margin as
+`name@remote`, while a tracked one is indented as `@remote` under its local
+name. After a fetch, `main@origin` carries the merge that just landed and
+`main` still points at the previous one. Nothing errors, and work started from
+the local trunk is based on a stale commit.
 
-Fix it once, per repository, and every later fetch advances the local
-bookmark on its own:
+Fix it once, per repository, and every later fetch advances the local bookmark
+on its own:
 
     jj bookmark track main@origin
 
-Do this immediately after initializing, not the first time it causes trouble.
-Substitute the repository's own trunk name where it is not `main`.
+`/init-jj` now runs this during initialization, so an adopted repository
+arrives already tracked. Do it by hand only where that did not run.
 
 ### After a pull request merges
 

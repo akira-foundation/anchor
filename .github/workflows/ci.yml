@@ -54,6 +54,21 @@ jobs:
             echo "AnchorDomain imports a UI framework" >&2
             exit 1
           fi
+      - name: Confine the testing framework to test support targets
+        run: |
+          offenders=$(grep -rlE '^import (Testing|XCTest)$' Packages/*/Sources \
+            | grep -v '/Sources/[A-Za-z]*TestSupport/' || true)
+          if [ -n "$offenders" ]; then
+            echo "A shipping target imports a testing framework:" >&2
+            echo "$offenders" >&2
+            exit 1
+          fi
+      - name: Reject a test support product in an application target
+        run: |
+          if grep -l 'TestSupport' Apps/*/*.xcodeproj/project.pbxproj; then
+            echo "An application target links a test support product" >&2
+            exit 1
+          fi
 
   build:
     runs-on: macos-26

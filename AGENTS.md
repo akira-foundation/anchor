@@ -212,6 +212,42 @@ Bookmarks are ordinary Git refs in a colocated repository, so any Git-side
 branch convention the repository already enforces keeps working unchanged.
 Only the command that creates them differs.
 
+### Track the trunk once, or it never follows the remote
+
+The same standing-still rule applies to the trunk, and it bites harder because
+it is silent. `jj git init` prints a hint that the remote bookmark is not
+associated with a local one, and a repository left that way never advances its
+local trunk:
+
+    main: ksrmrvtt 957eaa0d          (empty) Merge pull request #2
+    main@origin: xyuyytqs fc45dde4   (empty) Merge pull request #3
+
+After a fetch, `main@origin` carries the merge that just landed and `main`
+still points at the previous one. Nothing errors. Work started from the local
+trunk is silently based on a stale commit.
+
+Fix it once, per repository, and every later fetch advances the local
+bookmark on its own:
+
+    jj bookmark track main@origin
+
+Do this immediately after initializing, not the first time it causes trouble.
+Substitute the repository's own trunk name where it is not `main`.
+
+### After a pull request merges
+
+    jj git fetch                     bring the merge down
+    jj bookmark list --all-remotes   confirm local, @git and @origin agree
+    jj new main                      start the next change on the merged trunk
+
+The forge usually deletes the feature bookmark when it merges, so the fetch
+removes it locally too and there is nothing to clean up by hand. Check the
+listing rather than assuming either way.
+
+Starting the next change with `jj new <trunk>` matters: the working copy is
+otherwise still a child of the pre-merge commit, and the next change is built
+on the wrong base without any warning.
+
 ### Pull requests
 
 Jujutsu has no pull request command. `jj git` covers clone, colocation,

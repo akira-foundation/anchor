@@ -63,6 +63,12 @@ jobs:
             echo "$offenders" >&2
             exit 1
           fi
+      - name: Reject agent scaffolding in the tree
+        run: |
+          if git ls-files | grep -E '^\.superpowers/|^[Dd]ocs/superpowers/|^\.graphify/|^[Dd]ocs/graphify/|\.graphify\.'; then
+            echo "agent scaffolding is tracked" >&2
+            exit 1
+          fi
       - name: Reject a test support product in an application target
         run: |
           if grep -l 'TestSupport' Apps/*/*.xcodeproj/project.pbxproj; then

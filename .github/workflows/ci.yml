@@ -33,6 +33,7 @@ jobs:
           - AnchorSearch
           - AnchorKnowledge
           - AnchorSharedUI
+          - AnchorPlatformMacOS
     steps:
       - uses: actions/checkout@v5
       - name: Select newest Xcode

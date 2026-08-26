@@ -35,6 +35,7 @@ Packages/
   AnchorSearch      search contracts
   AnchorKnowledge   knowledge extraction contracts
   AnchorSharedUI    shared SwiftUI presentation components
+  AnchorPlatformMacOS  macOS drivers for the application contracts
 Scripts/            verification scripts
 Anchor.xcworkspace
 ```
@@ -45,7 +46,8 @@ Anchor.xcworkspace
 AnchorFoundation
     ├── AnchorDomain
     │       ├── AnchorApplication
-    │       │       └── AnchorSync
+    │       │       ├── AnchorSync
+    │       │       └── AnchorPlatformMacOS   (macOS only)
     │       ├── AnchorPersistence
     │       ├── AnchorStorage
     │       ├── AnchorSearch

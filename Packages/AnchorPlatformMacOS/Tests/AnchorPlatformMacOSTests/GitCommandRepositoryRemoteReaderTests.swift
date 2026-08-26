@@ -106,8 +106,8 @@ struct GitCommandRepositoryRemoteReaderTests {
         )
     }
 
-    @Test("several remotes with none named origin are handed back to be chosen")
-    func severalRemotesWithNoneNamedOriginAreHandedBack() async throws {
+    @Test("several remote names are handed back to be chosen")
+    func severalRemoteNamesAreHandedBack() async throws {
         let repository = try GitFixture.makeRepository(named: "ambiguous")
         try GitFixture.addRemote(
             named: "gitlab", url: "https://gitlab.example.com/team/service.git", to: repository)
@@ -116,6 +116,6 @@ struct GitCommandRepositoryRemoteReaderTests {
 
         let outcome = try await reader.readRepositoryRemote(atDirectory: repository)
 
-        #expect(outcome == .severalRemotes(["gitlab", "mirror"]))
+        #expect(outcome == .severalRemoteNames(["gitlab", "mirror"]))
     }
 }

@@ -11,19 +11,21 @@ public func verifyProjectStoreConformance<Store: ProjectStore>(
     try await verifyEveryStoredProjectIsReturned(makeStore)
 }
 
-private func makeProject(displayName: String) -> Project {
-    Project(
-        id: ProjectID(),
-        displayName: displayName,
-        canonicalRepositoryRemote: "github.com/akira-foundation/\(displayName.lowercased())"
+private func makeProject(displayName: String) throws -> Project {
+    let repositoryRemote = try #require(
+        CanonicalRepositoryRemote(
+            gitRemote: "github.com/akira-foundation/\(displayName.lowercased())")
     )
+
+    return Project(
+        id: ProjectID(), displayName: displayName, canonicalRepositoryRemote: repositoryRemote)
 }
 
 private func verifyStoredProjectIsReturnedByItsIdentifier<Store: ProjectStore>(
     _ makeStore: @Sendable () async -> Store
 ) async throws {
     let projectStore = await makeStore()
-    let expectedProject = makeProject(displayName: "Anchor")
+    let expectedProject = try makeProject(displayName: "Anchor")
 
     try await projectStore.storeProject(expectedProject)
 
@@ -45,7 +47,7 @@ private func verifyStoringAProjectAgainReplacesItRatherThanDuplicatingIt<Store: 
     _ makeStore: @Sendable () async -> Store
 ) async throws {
     let projectStore = await makeStore()
-    let originalProject = makeProject(displayName: "Anchor")
+    let originalProject = try makeProject(displayName: "Anchor")
     let renamedProject = Project(
         id: originalProject.id,
         displayName: "Anchor Context Layer",
@@ -62,8 +64,8 @@ private func verifyEveryStoredProjectIsReturned<Store: ProjectStore>(
     _ makeStore: @Sendable () async -> Store
 ) async throws {
     let projectStore = await makeStore()
-    let firstProject = makeProject(displayName: "Anchor")
-    let secondProject = makeProject(displayName: "Dotsync")
+    let firstProject = try makeProject(displayName: "Anchor")
+    let secondProject = try makeProject(displayName: "Dotsync")
 
     try await projectStore.storeProject(firstProject)
     try await projectStore.storeProject(secondProject)

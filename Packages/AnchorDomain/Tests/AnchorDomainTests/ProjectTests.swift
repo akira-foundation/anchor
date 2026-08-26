@@ -5,8 +5,9 @@ import Testing
 @Suite("Project identity")
 struct ProjectTests {
     @Test("two projects with the same remote but different identifiers are distinct")
-    func twoProjectsWithTheSameRemoteButDifferentIdentifiersAreDistinct() {
-        let sharedRemote = "github.com/akira-foundation/anchor"
+    func twoProjectsWithTheSameRemoteButDifferentIdentifiersAreDistinct() throws {
+        let sharedRemote = try #require(
+            CanonicalRepositoryRemote(rawValue: "github.com/akira-foundation/anchor"))
         let firstProject = Project(
             id: ProjectID(),
             displayName: "Anchor",
@@ -22,17 +23,19 @@ struct ProjectTests {
     }
 
     @Test("a project keeps its identity when its display name changes")
-    func projectKeepsItsIdentityWhenItsDisplayNameChanges() {
+    func projectKeepsItsIdentityWhenItsDisplayNameChanges() throws {
+        let anchorRemote = try #require(
+            CanonicalRepositoryRemote(rawValue: "github.com/akira-foundation/anchor"))
         let projectID = ProjectID()
         let originalProject = Project(
             id: projectID,
             displayName: "Anchor",
-            canonicalRepositoryRemote: "github.com/akira-foundation/anchor"
+            canonicalRepositoryRemote: anchorRemote
         )
         let renamedProject = Project(
             id: projectID,
             displayName: "Anchor Context Layer",
-            canonicalRepositoryRemote: "github.com/akira-foundation/anchor"
+            canonicalRepositoryRemote: anchorRemote
         )
 
         #expect(originalProject.id == renamedProject.id)

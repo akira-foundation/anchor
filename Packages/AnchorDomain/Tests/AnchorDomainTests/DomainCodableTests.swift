@@ -21,7 +21,9 @@ struct DomainCodableTests {
             Project(
                 id: ProjectID(),
                 displayName: "Anchor",
-                canonicalRepositoryRemote: "github.com/akira-foundation/anchor"
+                canonicalRepositoryRemote: try #require(
+                    CanonicalRepositoryRemote(rawValue: "github.com/akira-foundation/anchor")
+                )
             )
         )
     }

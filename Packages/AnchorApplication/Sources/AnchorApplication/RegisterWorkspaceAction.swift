@@ -16,7 +16,7 @@ public enum RegisterWorkspaceOutcome: Sendable, Equatable {
     case deviceCannotDiscover
     case repositoryWithoutRemote(URL)
     case notARepository(URL)
-    case severalRemotes([String])
+    case severalRemoteNames([String])
 }
 
 public struct RegisterWorkspaceAction: Action {
@@ -44,8 +44,8 @@ public struct RegisterWorkspaceAction: Action {
             return .notARepository(request.directoryURL)
         case .repositoryWithoutRemote:
             return .repositoryWithoutRemote(request.directoryURL)
-        case .severalRemotes(let candidates):
-            return .severalRemotes(candidates)
+        case .severalRemoteNames(let remoteNames):
+            return .severalRemoteNames(remoteNames)
         case .remote(let repositoryRemote):
             return try await registerWorkspace(for: repositoryRemote, request: request)
         }

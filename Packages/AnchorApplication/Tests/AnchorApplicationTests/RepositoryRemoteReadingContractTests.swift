@@ -50,17 +50,19 @@ struct RepositoryRemoteReadingContractTests {
         #expect(outcome == .notARepository)
     }
 
-    @Test("several remotes with none named origin are reported for the user to choose")
-    func severalRemotesWithNoneNamedOriginAreReportedForTheUserToChoose() async throws {
-        let candidates = ["github.com/kid/fork", "github.com/akira-io/original"]
+    @Test("several remote names are reported for the user to choose")
+    func severalRemoteNamesAreReportedForTheUserToChoose() async throws {
+        let remoteNames = ["origin", "upstream"]
         let reader = FixtureRepositoryRemoteReader(
-            outcomesByDirectory: [URL(filePath: "/Developer/fork"): .severalRemotes(candidates)]
+            outcomesByDirectory: [
+                URL(filePath: "/Developer/fork"): .severalRemoteNames(remoteNames)
+            ]
         )
 
         let outcome = try await reader.readRepositoryRemote(
             atDirectory: URL(filePath: "/Developer/fork"))
 
-        #expect(outcome == .severalRemotes(candidates))
+        #expect(outcome == .severalRemoteNames(remoteNames))
     }
 
     @Test("a reader that cannot run reports a failure rather than a missing repository")

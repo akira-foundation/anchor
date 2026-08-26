@@ -18,7 +18,7 @@ public struct GitCommandRepositoryRemoteReader: RepositoryRemoteReading {
 
         let remoteNames = try remoteNames(inDirectory: directoryURL)
         guard let chosenRemoteName = chooseRemoteName(from: remoteNames) else {
-            return remoteNames.isEmpty ? .repositoryWithoutRemote : .severalRemotes(remoteNames)
+            return remoteNames.isEmpty ? .repositoryWithoutRemote : .severalRemoteNames(remoteNames)
         }
 
         let remoteURL = try runGit(

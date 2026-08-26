@@ -100,14 +100,14 @@ struct RegisterWorkspaceActionTests {
     @Test("several remotes are handed back for the user to choose")
     func severalRemotesAreHandedBackForTheUserToChoose() async throws {
         let registry = RecordingWorkspaceRegistry()
-        let candidates = ["github.com/kid/fork", "github.com/akira-io/original"]
-        let action = makeAction(outcome: .severalRemotes(candidates), registry: registry)
+        let remoteNames = ["gitlab", "mirror"]
+        let action = makeAction(outcome: .severalRemoteNames(remoteNames), registry: registry)
 
         let outcome = try await action.perform(
             RegisterWorkspaceRequest(device: developmentMac, directoryURL: payableDirectory)
         )
 
-        #expect(outcome == .severalRemotes(candidates))
+        #expect(outcome == .severalRemoteNames(remoteNames))
         #expect(await registry.registeredWorkspaces.isEmpty)
     }
 }

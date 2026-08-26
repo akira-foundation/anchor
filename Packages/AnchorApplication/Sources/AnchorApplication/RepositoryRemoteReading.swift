@@ -9,7 +9,7 @@ public enum RepositoryRemoteOutcome: Sendable, Equatable {
     case remote(CanonicalRepositoryRemote)
     case repositoryWithoutRemote
     case notARepository
-    case severalRemotes([String])
+    case severalRemoteNames([String])
 }
 
 public enum RepositoryRemoteFailure: Error, Sendable, Equatable {

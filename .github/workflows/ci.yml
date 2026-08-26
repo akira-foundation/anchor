@@ -33,6 +33,7 @@ jobs:
           - AnchorSearch
           - AnchorKnowledge
           - AnchorSharedUI
+          - AnchorProvider
           - AnchorPlatformMacOS
     steps:
       - uses: actions/checkout@v5

@@ -87,6 +87,11 @@ Do not write tests that only inflate the test count. Do not remove or disable a 
 
 If the behavior of an external system is unknown, investigate it before implementing against it. The behavior of Claude Code, Codex, Superpowers, Graphify, MCP, and iCloud must never be assumed, guessed, or inferred from a plausible-sounding API. Cite the source that establishes the behavior, or do not implement it.
 
+## Language
+
+Code, `README.md`, `AGENTS.md`, commit messages and pull request descriptions are
+written in English. Working material that stays on the author's disk is not.
+
 ## Process
 
 - No automatic architectural changes. A deviation from the agreed architecture is proposed and approved before it is written.

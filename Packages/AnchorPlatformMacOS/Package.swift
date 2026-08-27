@@ -11,6 +11,7 @@ let package = Package(
     dependencies: [
         .package(path: "../AnchorDomain"),
         .package(path: "../AnchorApplication"),
+        .package(path: "../AnchorProvider"),
     ],
     targets: [
         .target(
@@ -18,6 +19,7 @@ let package = Package(
             dependencies: [
                 .product(name: "AnchorDomain", package: "AnchorDomain"),
                 .product(name: "AnchorApplication", package: "AnchorApplication"),
+                .product(name: "AnchorProvider", package: "AnchorProvider"),
             ]
         ),
         .testTarget(

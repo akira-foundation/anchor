@@ -19,9 +19,24 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
     nonisolated public func observeWorkspaceChanges(
         at workspaceURL: URL
     ) -> AsyncStream<WorkspaceChange> {
+        observeWorkspaceChanges(at: workspaceURL, resumingFrom: nil)
+    }
+
+    nonisolated public func observeWorkspaceChanges(
+        at workspaceURL: URL,
+        resumingFrom checkpoint: UInt64?
+    ) -> AsyncStream<WorkspaceChange> {
         AsyncStream { continuation in
-            Task { await self.startObserving(at: workspaceURL, continuation: continuation) }
+            Task {
+                await self.startObserving(
+                    at: workspaceURL, resumingFrom: checkpoint, continuation: continuation
+                )
+            }
         }
+    }
+
+    public func latestCheckpoint() -> UInt64? {
+        stream.map(FileSystemEventStream.latestEventID)
     }
 
     public func stopObserving() async {
@@ -49,11 +64,14 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
 
     private func startObserving(
         at workspaceURL: URL,
+        resumingFrom checkpoint: UInt64?,
         continuation: AsyncStream<WorkspaceChange>.Continuation
     ) {
         self.workspaceURL = workspaceURL
         self.continuation = continuation
-        stream = FileSystemEventStream.start(at: workspaceURL, delivering: self)
+        stream = FileSystemEventStream.start(
+            at: workspaceURL, resumingFrom: checkpoint, delivering: self
+        )
     }
 
     private func scheduleFlush() {

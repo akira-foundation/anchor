@@ -2,18 +2,20 @@ import AnchorDomain
 import AnchorProvider
 import Foundation
 
-public enum SuperpowersMaterializationFailure: Error, Sendable, Equatable {
+public enum ArtifactMaterializationFailure: Error, Sendable, Equatable {
     case nameIsNotARelativePath(String)
 }
 
-extension SuperpowersArtifactProvider: ArtifactMaterializing {
+public struct FileSystemArtifactMaterializer: ArtifactMaterializing {
+    public init() {}
+
     public func materializeArtifact(
         _ artifact: Artifact,
         content: Data,
         atDestination destinationURL: URL
     ) async throws {
         guard let relativeKey = StorageKey(rawValue: artifact.name) else {
-            throw SuperpowersMaterializationFailure.nameIsNotARelativePath(artifact.name)
+            throw ArtifactMaterializationFailure.nameIsNotARelativePath(artifact.name)
         }
 
         let fileURL = destinationURL.appending(path: relativeKey.rawValue)

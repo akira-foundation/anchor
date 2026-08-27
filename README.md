@@ -46,6 +46,8 @@ Anchor.xcworkspace
 ```
 AnchorFoundation
     ├── AnchorDomain
+    │       ├── AnchorProvider
+    │       │       └── AnchorApplication
     │       ├── AnchorApplication
     │       │       ├── AnchorSync
     │       │       └── AnchorPlatformMacOS   (macOS only)

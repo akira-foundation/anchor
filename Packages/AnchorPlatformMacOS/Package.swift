@@ -12,6 +12,7 @@ let package = Package(
         .package(path: "../AnchorDomain"),
         .package(path: "../AnchorApplication"),
         .package(path: "../AnchorProvider"),
+        .package(path: "../AnchorStorage"),
     ],
     targets: [
         .target(
@@ -20,6 +21,7 @@ let package = Package(
                 .product(name: "AnchorDomain", package: "AnchorDomain"),
                 .product(name: "AnchorApplication", package: "AnchorApplication"),
                 .product(name: "AnchorProvider", package: "AnchorProvider"),
+                .product(name: "AnchorStorage", package: "AnchorStorage"),
             ]
         ),
         .testTarget(

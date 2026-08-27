@@ -22,11 +22,12 @@ public struct GraphifyArtifactProvider: ArtifactDiscovering, ArtifactClassifying
     }
 
     public func classifyKnowledgeEntries(
-        in discoveredArtifact: DiscoveredArtifact
+        in discoveredArtifact: DiscoveredArtifact,
+        content: Data
     ) async throws -> [KnowledgeEntry] {
         let fileName = String(discoveredArtifact.artifact.name.split(separator: "/").last ?? "")
         guard !Self.dataFileNames.contains(fileName) else { return [] }
-        guard let firstLine = firstNonEmptyLine(ofFileNamed: fileName) else { return [] }
+        guard let firstLine = ArtifactSummaryLine.firstNonEmptyLine(of: content) else { return [] }
 
         return [
             KnowledgeEntry(
@@ -56,15 +57,6 @@ public struct GraphifyArtifactProvider: ArtifactDiscovering, ArtifactClassifying
         guard let artifact else { return nil }
 
         return DiscoveredArtifact(artifact: artifact, contentHash: ContentHash.digest(of: content))
-    }
-
-    private func firstNonEmptyLine(ofFileNamed fileName: String) -> String? {
-        guard let content = try? Data(contentsOf: fileURL(named: fileName)) else { return nil }
-
-        return String(decoding: content, as: UTF8.self)
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty }
     }
 
     private func fileURL(named fileName: String) -> URL {

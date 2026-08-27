@@ -10,10 +10,12 @@ struct SuperpowersClassificationTests {
     private let projectID = ProjectID()
 
     private func classifyOnly(_ files: [String: String]) async throws -> [KnowledgeEntry] {
-        let provider = SuperpowersArtifactProvider(workspaceURL: try WorkspaceFixture.make(files))
+        let workspace = try WorkspaceFixture.make(files)
+        let provider = SuperpowersArtifactProvider(workspaceURL: workspace)
         var entries: [KnowledgeEntry] = []
         for discovered in try await provider.discoverArtifacts(forProject: projectID) {
-            entries += try await provider.classifyKnowledgeEntries(in: discovered)
+            let content = try Data(contentsOf: workspace.appending(path: discovered.artifact.name))
+            entries += try await provider.classifyKnowledgeEntries(in: discovered, content: content)
         }
 
         return entries
@@ -74,7 +76,11 @@ struct SuperpowersClassificationTests {
         let discovered = try #require(
             try await provider.discoverArtifacts(forProject: projectID).first)
 
-        let entry = try #require(try await provider.classifyKnowledgeEntries(in: discovered).first)
+        let entry = try #require(
+            try await provider.classifyKnowledgeEntries(
+                in: discovered, content: Data("# Design review\nbody".utf8)
+            ).first
+        )
 
         #expect(entry.source == .artifact(discovered.artifact.id))
         #expect(entry.projectID == projectID)

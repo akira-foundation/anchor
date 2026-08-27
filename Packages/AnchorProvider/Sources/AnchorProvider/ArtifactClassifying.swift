@@ -1,7 +1,9 @@
 import AnchorDomain
+import Foundation
 
 public protocol ArtifactClassifying: Sendable {
     func classifyKnowledgeEntries(
-        in discoveredArtifact: DiscoveredArtifact
+        in discoveredArtifact: DiscoveredArtifact,
+        content: Data
     ) async throws -> [KnowledgeEntry]
 }

@@ -14,7 +14,8 @@ struct ProviderContractTests {
 
         let discovered = try await sessionProvider.discoverArtifacts(forProject: projectID)
         let entries = try await sessionProvider.classifyKnowledgeEntries(
-            in: try #require(discovered.first))
+            in: try #require(discovered.first), content: Data("conversation".utf8)
+        )
 
         #expect(discovered.count == 1)
         #expect(entries.first?.kind == .summary)
@@ -97,7 +98,8 @@ private struct ReadOnlySessionProvider: ArtifactDiscovering, ArtifactClassifying
     }
 
     func classifyKnowledgeEntries(
-        in discoveredArtifact: DiscoveredArtifact
+        in discoveredArtifact: DiscoveredArtifact,
+        content: Data
     ) async throws -> [KnowledgeEntry] {
         [
             KnowledgeEntry(

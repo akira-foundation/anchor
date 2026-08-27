@@ -21,8 +21,6 @@ enum SuperpowersArtifactLocation: String, CaseIterable {
     }
 
     var pathsOnDisk: [String] {
-        guard rawValue.hasPrefix("docs/") else { return [rawValue] }
-
-        return [rawValue, "D" + rawValue.dropFirst()]
+        WorkspacePathSpelling.spellingsOnDisk(of: rawValue)
     }
 }

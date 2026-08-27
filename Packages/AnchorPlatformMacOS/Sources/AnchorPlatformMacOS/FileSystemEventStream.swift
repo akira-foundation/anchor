@@ -8,10 +8,10 @@ enum FileSystemEventStream {
     private static let coalescingLatency = 0.1
 
     static func start(
-        at workspaceURL: URL, delivering observer: FileSystemEventObserver
-    )
-        -> FSEventStreamRef?
-    {
+        at workspaceURL: URL,
+        resumingFrom checkpoint: UInt64?,
+        delivering observer: FileSystemEventObserver
+    ) -> FSEventStreamRef? {
         let delivery = Unmanaged.passRetained(EventDelivery(observer: observer)).toOpaque()
         var context = FSEventStreamContext(
             version: 0,
@@ -30,7 +30,7 @@ enum FileSystemEventStream {
             },
             &context,
             [workspaceURL.path()] as CFArray,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            checkpoint ?? FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             coalescingLatency,
             creationFlags
         )
@@ -43,6 +43,10 @@ enum FileSystemEventStream {
         FSEventStreamStart(stream)
 
         return stream
+    }
+
+    static func latestEventID(of stream: FSEventStreamRef) -> UInt64 {
+        FSEventStreamGetLatestEventId(stream)
     }
 
     static func tearDown(_ stream: FSEventStreamRef) {

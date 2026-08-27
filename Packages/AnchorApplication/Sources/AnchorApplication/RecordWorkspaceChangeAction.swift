@@ -23,13 +23,13 @@ public struct RecordWorkspaceChangeAction: Action {
     private let discoverer: any ArtifactDiscovering
     private let contentReader: any ArtifactContentReading
     private let revisionRecorder: ArtifactRevisionRecorder
-    private let operationJournal: AppendOnlySyncOperationJournal
+    private let operationJournal: any SyncOperationJournal
 
     public init(
         discoverer: any ArtifactDiscovering,
         contentReader: any ArtifactContentReading,
         revisionRecorder: ArtifactRevisionRecorder,
-        operationJournal: AppendOnlySyncOperationJournal
+        operationJournal: any SyncOperationJournal
     ) {
         self.discoverer = discoverer
         self.contentReader = contentReader

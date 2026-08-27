@@ -1,7 +1,7 @@
 import AnchorDomain
 import Foundation
 
-public actor AppendOnlySyncOperationJournal {
+public actor AppendOnlySyncOperationJournal: SyncOperationJournal {
     private var entries: [SyncOperation] = []
 
     public init() {}

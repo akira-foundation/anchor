@@ -31,6 +31,25 @@ public struct SuperpowersArtifactProvider: ArtifactDiscovering {
         return []
     }
 
+    func readContent(of artifact: Artifact) -> Data? {
+        guard
+            let location = SuperpowersArtifactLocation.location(
+                forCanonicalPath: artifact.name.split(separator: "/").dropLast().joined(
+                    separator: "/")
+            )
+        else {
+            return nil
+        }
+
+        let fileName = String(artifact.name.split(separator: "/").last ?? "")
+        for pathOnDisk in location.pathsOnDisk {
+            let fileURL = workspaceURL.appending(path: pathOnDisk).appending(path: fileName)
+            if let content = try? Data(contentsOf: fileURL) { return content }
+        }
+
+        return nil
+    }
+
     private func discoverArtifacts(
         under pathOnDisk: String,
         canonicalPath: String,

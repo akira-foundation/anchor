@@ -4,12 +4,7 @@ import AnchorStorage
 import Foundation
 
 actor InMemoryCloudRecordDatabase: CloudRecordDatabase {
-    private struct Record {
-        var snapshot: CloudRecordSnapshot
-        var contents: Data
-    }
-
-    private var records: [String: Record] = [:]
+    private var records: [String: CloudRecordSnapshot] = [:]
     private var log: [CloudLogEntry] = []
     private var issuedTagCount = 0
     private let modifiedAt: Date
@@ -19,11 +14,11 @@ actor InMemoryCloudRecordDatabase: CloudRecordDatabase {
     }
 
     func snapshot(named name: String) async throws(CloudDatabaseFailure) -> CloudRecordSnapshot? {
-        records[name]?.snapshot
+        records[name]
     }
 
     func objectSnapshots() async throws(CloudDatabaseFailure) -> [CloudRecordSnapshot] {
-        records.values.map(\.snapshot)
+        Array(records.values)
     }
 
     @discardableResult
@@ -32,18 +27,17 @@ actor InMemoryCloudRecordDatabase: CloudRecordDatabase {
         precondition: StorageWritePrecondition,
         recording entry: CloudLogEntry
     ) async throws(CloudDatabaseFailure) -> CloudRecordSnapshot {
-        try verify(precondition, against: records[draft.name]?.snapshot.versionTag)
+        try verify(precondition, against: records[draft.name]?.versionTag)
 
         issuedTagCount += 1
         let snapshot = CloudRecordSnapshot(
-            name: draft.name,
             key: draft.key,
             byteSize: draft.contents.count,
             contents: draft.contents,
             versionTag: StorageVersionTag(rawValue: "tag-\(issuedTagCount)"),
             modifiedAt: modifiedAt
         )
-        records[draft.name] = Record(snapshot: snapshot, contents: draft.contents)
+        records[draft.name] = snapshot
         log.append(entry)
 
         return snapshot

@@ -15,7 +15,6 @@ public struct CloudRecordDraft: Sendable, Hashable {
 }
 
 public struct CloudRecordSnapshot: Sendable, Hashable {
-    public let name: String
     public let key: StorageKey
     public let byteSize: Int
     public let contents: Data?
@@ -23,14 +22,12 @@ public struct CloudRecordSnapshot: Sendable, Hashable {
     public let modifiedAt: Date
 
     public init(
-        name: String,
         key: StorageKey,
         byteSize: Int,
         contents: Data?,
         versionTag: StorageVersionTag,
         modifiedAt: Date
     ) {
-        self.name = name
         self.key = key
         self.byteSize = byteSize
         self.contents = contents

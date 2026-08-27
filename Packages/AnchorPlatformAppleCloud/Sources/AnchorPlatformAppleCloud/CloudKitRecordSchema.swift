@@ -32,7 +32,6 @@ enum CloudKitRecordSchema {
         else { return nil }
 
         return CloudRecordSnapshot(
-            name: record.recordID.recordName,
             key: key,
             byteSize: byteSize,
             contents: contents(of: record),

@@ -84,9 +84,10 @@ struct GraphifyArtifactProviderTests {
         let provider = GraphifyArtifactProvider(workspaceURL: workspace)
         var entriesByName: [String: [KnowledgeEntry]] = [:]
         for discovered in try await provider.discoverArtifacts(forProject: projectID) {
+            let content = try Data(contentsOf: workspace.appending(path: discovered.artifact.name))
             entriesByName[discovered.artifact.name] =
                 try await provider
-                .classifyKnowledgeEntries(in: discovered)
+                .classifyKnowledgeEntries(in: discovered, content: content)
         }
 
         #expect(entriesByName["graphify-out/graph.json"]?.isEmpty == true)

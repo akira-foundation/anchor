@@ -4,9 +4,10 @@ import Foundation
 
 extension SuperpowersArtifactProvider: ArtifactClassifying {
     public func classifyKnowledgeEntries(
-        in discoveredArtifact: DiscoveredArtifact
+        in discoveredArtifact: DiscoveredArtifact,
+        content: Data
     ) async throws -> [KnowledgeEntry] {
-        guard let firstLine = firstNonEmptyLine(of: discoveredArtifact.artifact) else { return [] }
+        guard let firstLine = ArtifactSummaryLine.firstNonEmptyLine(of: content) else { return [] }
 
         return [
             KnowledgeEntry(
@@ -25,14 +26,5 @@ extension SuperpowersArtifactProvider: ArtifactClassifying {
 
         return SuperpowersArtifactLocation.location(forCanonicalPath: canonicalPath)?
             .vouchedKnowledgeKind ?? .summary
-    }
-
-    private func firstNonEmptyLine(of artifact: Artifact) -> String? {
-        guard let content = readContent(of: artifact) else { return nil }
-
-        return String(decoding: content, as: UTF8.self)
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty }
     }
 }

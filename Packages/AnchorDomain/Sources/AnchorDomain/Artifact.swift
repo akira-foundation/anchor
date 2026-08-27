@@ -7,7 +7,9 @@ public struct Artifact: Sendable, Hashable, Codable, Identifiable {
     public let name: String
 
     public init?(id: ArtifactID, projectID: ProjectID, provider: AgentProvider, name: String) {
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard !name.isEmpty, name == name.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
+        }
 
         self.id = id
         self.projectID = projectID
@@ -28,7 +30,7 @@ public struct Artifact: Sendable, Hashable, Codable, Identifiable {
             throw DecodingError.dataCorruptedError(
                 forKey: .name,
                 in: container,
-                debugDescription: "Artifact name is empty or only whitespace"
+                debugDescription: "Artifact name is empty or padded with whitespace"
             )
         }
 

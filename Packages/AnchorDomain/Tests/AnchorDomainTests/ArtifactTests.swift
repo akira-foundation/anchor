@@ -45,10 +45,10 @@ struct ArtifactTests {
     }
 
     @Test(
-        "a name that is empty or only whitespace is rejected",
-        arguments: ["", " ", "\t", "\n", "   \n  "]
+        "a name that is empty or padded with whitespace is rejected",
+        arguments: ["", " ", "\t", "\n", "   \n  ", " commit-guard", "commit-guard ", "\tskill"]
     )
-    func aNameThatIsEmptyOrOnlyWhitespaceIsRejected(_ name: String) {
+    func aNameThatIsEmptyOrPaddedWithWhitespaceIsRejected(_ name: String) {
         #expect(
             Artifact(id: ArtifactID(), projectID: ProjectID(), provider: .codex, name: name) == nil)
     }

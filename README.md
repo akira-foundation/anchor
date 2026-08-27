@@ -34,6 +34,7 @@ Packages/
   AnchorSync        synchronization contracts
   AnchorSearch      search contracts
   AnchorKnowledge   knowledge extraction contracts
+  AnchorProvider    agent provider contracts
   AnchorSharedUI    shared SwiftUI presentation components
   AnchorPlatformMacOS  macOS drivers for the application contracts
 Scripts/            verification scripts
@@ -48,6 +49,7 @@ AnchorFoundation
     │       ├── AnchorApplication
     │       │       ├── AnchorSync
     │       │       └── AnchorPlatformMacOS   (macOS only)
+    │       ├── AnchorProvider
     │       ├── AnchorPersistence
     │       ├── AnchorStorage
     │       ├── AnchorSearch

@@ -1,4 +1,6 @@
 import AnchorFoundation
+import CryptoKit
+import Foundation
 
 public struct ContentHash: ValidatedRawValue, Hashable, CustomStringConvertible {
     public static let expectedDigestLength = 64
@@ -10,6 +12,16 @@ public struct ContentHash: ValidatedRawValue, Hashable, CustomStringConvertible 
     private static let lowercaseHexadecimalBytes = Set("0123456789abcdef".utf8)
 
     public let rawValue: String
+
+    private init(digestedRawValue: String) {
+        self.rawValue = digestedRawValue
+    }
+
+    public static func digest(of content: Data) -> ContentHash {
+        let digest = SHA256.hash(data: content)
+
+        return ContentHash(digestedRawValue: digest.map { String(format: "%02x", $0) }.joined())
+    }
 
     public init?(rawValue: String) {
         let rawValueBytes = Array(rawValue.utf8)

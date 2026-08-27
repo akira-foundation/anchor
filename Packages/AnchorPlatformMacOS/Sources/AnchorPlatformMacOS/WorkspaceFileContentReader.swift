@@ -8,18 +8,12 @@ public struct WorkspaceFileContentReader: ArtifactContentReading {
         ofArtifactNamed name: String,
         inWorkspaceAt workspaceURL: URL
     ) async throws -> Data? {
-        for candidate in candidatePaths(for: name) {
+        for candidate in WorkspacePathSpelling.spellingsOnDisk(of: name) {
             if let contents = try? Data(contentsOf: workspaceURL.appending(path: candidate)) {
                 return contents
             }
         }
 
         return nil
-    }
-
-    private func candidatePaths(for name: String) -> [String] {
-        guard name.hasPrefix("docs/") else { return [name] }
-
-        return [name, "D" + name.dropFirst()]
     }
 }

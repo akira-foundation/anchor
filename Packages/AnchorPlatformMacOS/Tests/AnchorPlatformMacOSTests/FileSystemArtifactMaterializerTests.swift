@@ -5,10 +5,10 @@ import Testing
 
 @testable import AnchorPlatformMacOS
 
-@Suite("Superpowers materialization")
-struct SuperpowersMaterializationTests {
+@Suite("Filesystem materialization")
+struct FileSystemArtifactMaterializerTests {
     private let projectID = ProjectID()
-    private let provider = SuperpowersArtifactProvider(workspaceURL: URL(filePath: "/unused"))
+    private let materializer = FileSystemArtifactMaterializer()
 
     private func makeArtifact(named name: String) throws -> Artifact {
         try #require(
@@ -20,7 +20,7 @@ struct SuperpowersMaterializationTests {
         let destination = try WorkspaceFixture.make([:])
         let artifact = try makeArtifact(named: "docs/superpowers/plans/00-indice.md")
 
-        try await provider.materializeArtifact(
+        try await materializer.materializeArtifact(
             artifact, content: Data("plan body".utf8), atDestination: destination
         )
 
@@ -35,9 +35,9 @@ struct SuperpowersMaterializationTests {
         let artifact = try makeArtifact(named: ".superpowers/sdd/design-review.md")
         let content = Data("review body".utf8)
 
-        try await provider.materializeArtifact(
+        try await materializer.materializeArtifact(
             artifact, content: content, atDestination: firstDestination)
-        try await provider.materializeArtifact(
+        try await materializer.materializeArtifact(
             artifact, content: content, atDestination: secondDestination)
 
         for destination in [firstDestination, secondDestination] {
@@ -51,9 +51,9 @@ struct SuperpowersMaterializationTests {
         let destination = try WorkspaceFixture.make([:])
         let artifact = try makeArtifact(named: "docs/superpowers/plans/00-indice.md")
 
-        try await provider.materializeArtifact(
+        try await materializer.materializeArtifact(
             artifact, content: Data("first".utf8), atDestination: destination)
-        try await provider.materializeArtifact(
+        try await materializer.materializeArtifact(
             artifact, content: Data("second".utf8), atDestination: destination)
 
         let written = destination.appending(path: "docs/superpowers/plans/00-indice.md")
@@ -73,8 +73,8 @@ struct SuperpowersMaterializationTests {
         let destination = try WorkspaceFixture.make([:])
         let artifact = try makeArtifact(named: name)
 
-        await #expect(throws: SuperpowersMaterializationFailure.nameIsNotARelativePath(name)) {
-            try await provider.materializeArtifact(
+        await #expect(throws: ArtifactMaterializationFailure.nameIsNotARelativePath(name)) {
+            try await materializer.materializeArtifact(
                 artifact, content: Data("payload".utf8), atDestination: destination
             )
         }
@@ -85,11 +85,42 @@ struct SuperpowersMaterializationTests {
         let destination = try WorkspaceFixture.make([:])
         let artifact = try makeArtifact(named: "../escaped.md")
 
-        _ = try? await provider.materializeArtifact(
+        _ = try? await materializer.materializeArtifact(
             artifact, content: Data("payload".utf8), atDestination: destination
         )
 
         let escaped = destination.deletingLastPathComponent().appending(path: "escaped.md")
         #expect(!FileManager.default.fileExists(atPath: escaped.path()))
+    }
+}
+
+extension FileSystemArtifactMaterializerTests {
+    @Test("one materializer serves every provider, because writing bytes is not provider work")
+    func oneMaterializerServesEveryProvider() async throws {
+        let destination = try WorkspaceFixture.make([:])
+        let fromSuperpowers = try #require(
+            Artifact(
+                id: ArtifactID(), projectID: projectID, provider: .superpowers,
+                name: "docs/superpowers/plans/00-indice.md"
+            )
+        )
+        let fromGraphify = try #require(
+            Artifact(
+                id: ArtifactID(), projectID: projectID, provider: .graphify,
+                name: "graphify-out/graph.json", retention: .latestRevisionOnly
+            )
+        )
+
+        try await materializer.materializeArtifact(
+            fromSuperpowers, content: Data("plan".utf8), atDestination: destination
+        )
+        try await materializer.materializeArtifact(
+            fromGraphify, content: Data("{}".utf8), atDestination: destination
+        )
+
+        for name in ["docs/superpowers/plans/00-indice.md", "graphify-out/graph.json"] {
+            #expect(
+                FileManager.default.fileExists(atPath: destination.appending(path: name).path()))
+        }
     }
 }

@@ -7,6 +7,7 @@ public struct ArtifactRevision: Sendable, Hashable, Codable, Identifiable {
     public let contentHash: ContentHash
     public let deviceID: DeviceID
     public let createdAt: Date
+    public let retention: ArtifactRetention
 
     public init?(
         id: RevisionID,
@@ -14,7 +15,8 @@ public struct ArtifactRevision: Sendable, Hashable, Codable, Identifiable {
         parentRevisionID: RevisionID?,
         contentHash: ContentHash,
         deviceID: DeviceID,
-        createdAt: Date
+        createdAt: Date,
+        retention: ArtifactRetention = .fullHistory
     ) {
         guard parentRevisionID != id else { return nil }
 
@@ -24,6 +26,7 @@ public struct ArtifactRevision: Sendable, Hashable, Codable, Identifiable {
         self.contentHash = contentHash
         self.deviceID = deviceID
         self.createdAt = createdAt
+        self.retention = retention
     }
 
     public init(from decoder: any Decoder) throws {
@@ -46,5 +49,8 @@ public struct ArtifactRevision: Sendable, Hashable, Codable, Identifiable {
         contentHash = try container.decode(ContentHash.self, forKey: .contentHash)
         deviceID = try container.decode(DeviceID.self, forKey: .deviceID)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        retention =
+            try container.decodeIfPresent(ArtifactRetention.self, forKey: .retention)
+            ?? .fullHistory
     }
 }

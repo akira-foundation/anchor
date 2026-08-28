@@ -27,10 +27,11 @@ public struct ArtifactRevisionRecorder: Sendable {
         let revision = ArtifactRevision(
             id: RevisionID(),
             artifactID: artifact.id,
-            parentRevisionID: parentRevisionID(after: latestRevision, under: artifact.retention),
+            parentRevisionID: latestRevision?.id,
             contentHash: contentHash,
             deviceID: deviceID,
-            createdAt: Date()
+            createdAt: Date(),
+            retention: artifact.retention
         )
         guard let revision else { return nil }
 
@@ -38,15 +39,5 @@ public struct ArtifactRevisionRecorder: Sendable {
         try await journal.recordRevision(revision)
 
         return revision
-    }
-
-    private func parentRevisionID(
-        after latestRevision: ArtifactRevision?,
-        under retention: ArtifactRetention
-    ) -> RevisionID? {
-        switch retention {
-        case .fullHistory: latestRevision?.id
-        case .latestRevisionOnly: nil
-        }
     }
 }

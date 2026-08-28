@@ -13,13 +13,15 @@ struct StoredArtifactRevisionJournalTests {
 
     private func makeRevision(
         parent: RevisionID? = nil,
-        contents: String
+        contents: String,
+        retention: ArtifactRetention = .fullHistory
     ) throws -> ArtifactRevision {
         try #require(
             ArtifactRevision(
                 id: RevisionID(), artifactID: artifactID, parentRevisionID: parent,
                 contentHash: ContentHash.digest(of: Data(contents.utf8)),
-                deviceID: deviceID, createdAt: Date(timeIntervalSince1970: 0)
+                deviceID: deviceID, createdAt: Date(timeIntervalSince1970: 0),
+                retention: retention
             )
         )
     }
@@ -62,13 +64,14 @@ struct StoredArtifactRevisionJournalTests {
         #expect(try await journal.latestRevision(forArtifact: artifactID)?.id == second.id)
     }
 
-    @Test("a revision without ancestry drops the ones it superseded")
-    func aRevisionWithoutAncestryDropsTheOnesItSuperseded() async throws {
+    @Test("single revision retention drops what it supersedes")
+    func singleRevisionRetentionDropsWhatItSupersedes() async throws {
         let storage = InMemoryStorageProvider()
         let journal = StoredArtifactRevisionJournal(
             storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
-        let first = try makeRevision(contents: "one")
-        let second = try makeRevision(contents: "two")
+        let first = try makeRevision(contents: "one", retention: .latestRevisionOnly)
+        let second = try makeRevision(
+            parent: nil, contents: "two", retention: .latestRevisionOnly)
 
         try await journal.recordRevision(first)
         try await journal.recordRevision(second)
@@ -131,8 +134,9 @@ extension StoredArtifactRevisionJournalTests {
         let storage = InMemoryStorageProvider()
         let contentStore = StoredArtifactContentStore(storage: storage)
         let journal = StoredArtifactRevisionJournal(storage: storage, contentStore: contentStore)
-        let superseded = try makeRevision(contents: "superseded")
-        let latest = try makeRevision(contents: "latest")
+        let superseded = try makeRevision(
+            contents: "superseded", retention: .latestRevisionOnly)
+        let latest = try makeRevision(contents: "latest", retention: .latestRevisionOnly)
 
         try await contentStore.storeContent(Data("superseded".utf8), forRevision: superseded.id)
         try await journal.recordRevision(superseded)
@@ -141,5 +145,19 @@ extension StoredArtifactRevisionJournalTests {
 
         #expect(try await contentStore.content(forRevision: superseded.id) == nil)
         #expect(try await contentStore.content(forRevision: latest.id) == Data("latest".utf8))
+    }
+
+    @Test("full history keeps a revision that has no parent")
+    func fullHistoryKeepsARevisionThatHasNoParent() async throws {
+        let storage = InMemoryStorageProvider()
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
+        let first = try makeRevision(contents: "one")
+        let second = try makeRevision(parent: first.id, contents: "two")
+
+        try await journal.recordRevision(first)
+        try await journal.recordRevision(second)
+
+        #expect(try await journal.revisionCount(forArtifact: artifactID) == 2)
     }
 }

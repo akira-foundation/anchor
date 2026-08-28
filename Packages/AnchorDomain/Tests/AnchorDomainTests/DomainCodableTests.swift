@@ -123,14 +123,7 @@ struct DomainCodableTests {
     func devicePresenceSurvivesAnEncodeAndDecodeRoundTrip() throws {
         try assertRoundTrip(
             DevicePresence(
-                id: PresenceID(),
-                projectID: ProjectID(),
-                deviceID: DeviceID(),
-                provider: .codex,
-                sessionID: SessionID(),
-                lastSeenAt: Self.fixedDate,
-                state: .active
-            )
+                projectID: ProjectID(), deviceID: DeviceID(), lastSeenAt: Self.fixedDate)
         )
     }
 }
@@ -190,18 +183,4 @@ struct DomainOptionalFieldCodableTests {
         )
     }
 
-    @Test("a device presence without a session survives an encode and decode round trip")
-    func devicePresenceWithoutASessionSurvivesAnEncodeAndDecodeRoundTrip() throws {
-        try assertRoundTrip(
-            DevicePresence(
-                id: PresenceID(),
-                projectID: ProjectID(),
-                deviceID: DeviceID(),
-                provider: .superpowers,
-                sessionID: nil,
-                lastSeenAt: Self.fixedDate,
-                state: .stoppedOrUnknown
-            )
-        )
-    }
 }

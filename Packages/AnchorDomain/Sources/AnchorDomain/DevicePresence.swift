@@ -1,29 +1,25 @@
 import Foundation
 
-public struct DevicePresence: Sendable, Hashable, Codable, Identifiable {
-    public let id: PresenceID
+public struct DevicePresence: Sendable, Hashable, Codable {
+    public static let activeWindow: TimeInterval = 120
+    public static let recentlyActiveWindow: TimeInterval = 1800
+
     public let projectID: ProjectID
     public let deviceID: DeviceID
-    public let provider: AgentProvider
-    public let sessionID: SessionID?
     public let lastSeenAt: Date
-    public let state: DevicePresenceState
 
-    public init(
-        id: PresenceID,
-        projectID: ProjectID,
-        deviceID: DeviceID,
-        provider: AgentProvider,
-        sessionID: SessionID?,
-        lastSeenAt: Date,
-        state: DevicePresenceState
-    ) {
-        self.id = id
+    public init(projectID: ProjectID, deviceID: DeviceID, lastSeenAt: Date) {
         self.projectID = projectID
         self.deviceID = deviceID
-        self.provider = provider
-        self.sessionID = sessionID
         self.lastSeenAt = lastSeenAt
-        self.state = state
+    }
+
+    public func state(asOf instant: Date) -> DevicePresenceState {
+        let elapsed = instant.timeIntervalSince(lastSeenAt)
+
+        guard elapsed > Self.activeWindow else { return .active }
+        guard elapsed > Self.recentlyActiveWindow else { return .recentlyActive }
+
+        return .stoppedOrUnknown
     }
 }

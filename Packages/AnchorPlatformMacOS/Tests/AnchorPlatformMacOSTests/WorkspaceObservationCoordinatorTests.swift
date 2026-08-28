@@ -38,7 +38,9 @@ struct WorkspaceObservationCoordinatorTests {
                 operationJournal: operationJournal
             ),
             synchronizer: makeSynchronizer(
-                storage: storage, remote: remote, operations: operationJournal)
+                storage: storage, remote: remote, operations: operationJournal),
+            presences: StoredDevicePresenceRegistry(storage: remote),
+            now: { Date(timeIntervalSince1970: 1_000) }
         )
 
         return (coordinator, operationJournal)
@@ -94,6 +96,28 @@ struct WorkspaceObservationCoordinatorTests {
         await coordinator.stopObserving()
 
         #expect(try await journal.history(of: interrupted.id).map(\.state).contains(.pending))
+    }
+
+    @Test("starting announces this machine on the project")
+    func startingAnnouncesThisMachineOnTheProject() async throws {
+        let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "plan"])
+        let storage = InMemoryStorageProvider()
+        let remote = InMemoryStorageProvider()
+        let mac = Device(id: DeviceID(), displayName: "Studio", platform: .macOS)
+        let (coordinator, _) = makeCoordinator(
+            device: mac, storage: storage,
+            checkpointStore: ObservationCheckpointStore(fileURL: makeCheckpointURL()),
+            workspaceURL: workspace, remote: remote
+        )
+
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        await coordinator.stopObserving()
+
+        let announced = try await StoredDevicePresenceRegistry(storage: remote)
+            .presences(onProject: projectID)
+
+        #expect(announced.map(\.deviceID) == [mac.id])
+        #expect(announced.first?.lastSeenAt == Date(timeIntervalSince1970: 1_000))
     }
 
     @Test("a device that cannot discover never starts observing")

@@ -3,10 +3,16 @@ import Foundation
 
 public struct ArtifactRevisionRecorder: Sendable {
     private let journal: any ArtifactRevisionJournal
+    private let contentStore: any ArtifactContentStore
     private let deviceID: DeviceID
 
-    public init(journal: any ArtifactRevisionJournal, deviceID: DeviceID) {
+    public init(
+        journal: any ArtifactRevisionJournal,
+        contentStore: any ArtifactContentStore,
+        deviceID: DeviceID
+    ) {
         self.journal = journal
+        self.contentStore = contentStore
         self.deviceID = deviceID
     }
 
@@ -28,6 +34,7 @@ public struct ArtifactRevisionRecorder: Sendable {
         )
         guard let revision else { return nil }
 
+        try await contentStore.storeContent(content, forRevision: revision.id)
         try await journal.recordRevision(revision)
 
         return revision

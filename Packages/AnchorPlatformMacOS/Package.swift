@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../AnchorApplication"),
         .package(path: "../AnchorProvider"),
         .package(path: "../AnchorStorage"),
+        .package(path: "../AnchorSync"),
     ],
     targets: [
         .target(
@@ -26,7 +27,11 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorPlatformMacOSTests",
-            dependencies: ["AnchorPlatformMacOS"]
+            dependencies: [
+                "AnchorPlatformMacOS",
+                .product(name: "AnchorApplicationTestSupport", package: "AnchorApplication"),
+                .product(name: "AnchorSync", package: "AnchorSync"),
+            ]
         ),
     ]
 )

@@ -20,7 +20,10 @@ struct RecordWorkspaceChangeActionTests {
             discoverer: StubDiscoverer(artifacts: artifacts),
             contentReader: StubContentReader(contentByName: content),
             revisionRecorder: ArtifactRevisionRecorder(
-                journal: journal, deviceID: developmentMac.id),
+                journal: journal,
+                contentStore: InMemoryArtifactContentStore(),
+                deviceID: developmentMac.id
+            ),
             operationJournal: AppendOnlySyncOperationJournal()
         )
     }
@@ -128,6 +131,10 @@ private actor RecordingRevisionJournal: ArtifactRevisionJournal {
 
     func latestRevision(forArtifact artifactID: ArtifactID) async throws -> ArtifactRevision? {
         recordedRevisions.last { $0.artifactID == artifactID }
+    }
+
+    func revision(withIdentifier revisionID: RevisionID) async throws -> ArtifactRevision? {
+        recordedRevisions.first { $0.id == revisionID }
     }
 
     func recordRevision(_ revision: ArtifactRevision) async throws {

@@ -44,7 +44,7 @@ public struct StoredArtifactRevisionJournal: ArtifactRevisionJournal {
             StorageObject(key: key, contents: contents), precondition: .none
         )
 
-        guard revision.parentRevisionID == nil else { return }
+        guard revision.retention == .latestRevisionOnly else { return }
 
         try await dropRevisions(
             forArtifact: revision.artifactID, exceptRevisionWithIdentifier: revision.id

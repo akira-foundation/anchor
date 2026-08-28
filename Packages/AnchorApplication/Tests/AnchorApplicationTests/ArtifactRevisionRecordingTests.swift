@@ -48,18 +48,20 @@ struct ArtifactRevisionRecordingTests {
         #expect(second.parentRevisionID == first.id)
     }
 
-    @Test("a derivable artifact keeps no ancestry")
-    func aDerivableArtifactKeepsNoAncestry() async throws {
+    @Test("a derivable artifact still records what it came from")
+    func aDerivableArtifactStillRecordsWhatItCameFrom() async throws {
         let artifact = try makeArtifact(retention: .latestRevisionOnly)
         let journal = RecordingRevisionJournal()
         let recorder = ArtifactRevisionRecorder(
             journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
-        _ = try await recorder.recordRevision(of: artifact, content: Data("one".utf8))
+        let first = try #require(
+            try await recorder.recordRevision(of: artifact, content: Data("one".utf8)))
         let second = try #require(
             try await recorder.recordRevision(of: artifact, content: Data("two".utf8)))
 
-        #expect(second.parentRevisionID == nil)
+        #expect(second.parentRevisionID == first.id)
+        #expect(second.retention == .latestRevisionOnly)
     }
 
     @Test("a revision carries the device that produced it and the digest of what it saw")

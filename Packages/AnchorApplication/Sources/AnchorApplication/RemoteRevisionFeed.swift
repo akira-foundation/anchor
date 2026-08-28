@@ -21,5 +21,5 @@ public protocol SyncCursorStore: Sendable {
 
 public protocol ArtifactDivergenceJournal: Sendable {
     func recordDivergence(_ divergence: ArtifactDivergence) async throws
-    func pendingDivergences() async throws -> [ArtifactDivergence]
+    func divergences() async throws -> [ArtifactDivergence]
 }

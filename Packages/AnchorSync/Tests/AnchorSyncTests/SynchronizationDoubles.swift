@@ -72,3 +72,33 @@ func makeRevision(
 
     return revision
 }
+
+actor StubRemoteRevisionFeed: RemoteRevisionFeed {
+    private let pages: [String?: RemoteRevisionPage]
+
+    init(pages: [String?: RemoteRevisionPage]) {
+        self.pages = pages
+    }
+
+    func revisions(after cursor: String?) async throws -> RemoteRevisionPage {
+        pages[cursor] ?? RemoteRevisionPage(revisions: [], cursor: nil)
+    }
+}
+
+actor InMemorySyncCursorStore: SyncCursorStore {
+    private var recorded: String?
+
+    func cursor() async throws -> String? { recorded }
+
+    func recordCursor(_ cursor: String) async throws { recorded = cursor }
+}
+
+actor InMemoryDivergenceJournal: ArtifactDivergenceJournal {
+    private var recorded: [ArtifactDivergence] = []
+
+    func recordDivergence(_ divergence: ArtifactDivergence) async throws {
+        recorded.append(divergence)
+    }
+
+    func pendingDivergences() async throws -> [ArtifactDivergence] { recorded }
+}

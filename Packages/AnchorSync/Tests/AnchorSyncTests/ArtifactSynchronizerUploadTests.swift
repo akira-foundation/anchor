@@ -42,7 +42,10 @@ struct ArtifactSynchronizerUploadTests {
 
         try await ArtifactSynchronizer(
             local: stores.local, remote: stores.remote, operations: operations,
-            failures: StubFailureClassifier()
+            failures: StubFailureClassifier(),
+            feed: StubRemoteRevisionFeed(pages: [:]),
+            cursors: InMemorySyncCursorStore(),
+            divergences: InMemoryDivergenceJournal()
         ).synchronizePendingArtifactRevisions()
 
         #expect(
@@ -64,7 +67,10 @@ struct ArtifactSynchronizerUploadTests {
 
         try await ArtifactSynchronizer(
             local: stores.local, remote: stores.remote, operations: operations,
-            failures: StubFailureClassifier()
+            failures: StubFailureClassifier(),
+            feed: StubRemoteRevisionFeed(pages: [:]),
+            cursors: InMemorySyncCursorStore(),
+            divergences: InMemoryDivergenceJournal()
         ).synchronizePendingArtifactRevisions()
 
         #expect(try await operations.currentState(of: operation.id) == .pending)
@@ -81,7 +87,10 @@ struct ArtifactSynchronizerUploadTests {
 
         try await ArtifactSynchronizer(
             local: stores.local, remote: stores.remote, operations: operations,
-            failures: StubFailureClassifier()
+            failures: StubFailureClassifier(),
+            feed: StubRemoteRevisionFeed(pages: [:]),
+            cursors: InMemorySyncCursorStore(),
+            divergences: InMemoryDivergenceJournal()
         ).synchronizePendingArtifactRevisions()
 
         #expect(try await operations.currentState(of: operation.id) == .failed)
@@ -98,7 +107,10 @@ struct ArtifactSynchronizerUploadTests {
 
         try await ArtifactSynchronizer(
             local: stores.local, remote: stores.remote, operations: operations,
-            failures: StubFailureClassifier()
+            failures: StubFailureClassifier(),
+            feed: StubRemoteRevisionFeed(pages: [:]),
+            cursors: InMemorySyncCursorStore(),
+            divergences: InMemoryDivergenceJournal()
         ).synchronizePendingArtifactRevisions()
 
         #expect(try await operations.currentState(of: operation.id) == .failed)

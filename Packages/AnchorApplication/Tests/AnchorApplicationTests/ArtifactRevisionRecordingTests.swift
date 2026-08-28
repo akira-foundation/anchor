@@ -25,8 +25,12 @@ struct ArtifactRevisionRecordingTests {
         let recorder = ArtifactRevisionRecorder(
             journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
-        _ = try await recorder.recordRevision(of: artifact, content: content)
-        let second = try await recorder.recordRevision(of: artifact, content: content)
+        _ = try await recorder.recordRevision(
+            of: artifact, contentHash: ContentHash.digest(of: content)
+        ) { content }
+        let second = try await recorder.recordRevision(
+            of: artifact, contentHash: ContentHash.digest(of: content)
+        ) { content }
 
         #expect(second == nil)
         #expect(await journal.recordedRevisions.count == 1)
@@ -40,9 +44,13 @@ struct ArtifactRevisionRecordingTests {
             journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         let first = try #require(
-            try await recorder.recordRevision(of: artifact, content: Data("one".utf8)))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: Data("one".utf8))
+            ) { Data("one".utf8) })
         let second = try #require(
-            try await recorder.recordRevision(of: artifact, content: Data("two".utf8)))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: Data("two".utf8))
+            ) { Data("two".utf8) })
 
         #expect(first.parentRevisionID == nil)
         #expect(second.parentRevisionID == first.id)
@@ -56,9 +64,13 @@ struct ArtifactRevisionRecordingTests {
             journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         let first = try #require(
-            try await recorder.recordRevision(of: artifact, content: Data("one".utf8)))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: Data("one".utf8))
+            ) { Data("one".utf8) })
         let second = try #require(
-            try await recorder.recordRevision(of: artifact, content: Data("two".utf8)))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: Data("two".utf8))
+            ) { Data("two".utf8) })
 
         #expect(second.parentRevisionID == first.id)
         #expect(second.retention == .latestRevisionOnly)
@@ -75,7 +87,9 @@ struct ArtifactRevisionRecordingTests {
         )
 
         let revision = try #require(
-            try await recorder.recordRevision(of: artifact, content: content))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: content)
+            ) { content })
 
         #expect(revision.deviceID == deviceID)
         #expect(revision.contentHash == ContentHash.digest(of: content))
@@ -90,7 +104,9 @@ struct ArtifactRevisionRecordingTests {
             journal: RecordingRevisionJournal(), contentStore: contentStore, deviceID: deviceID)
 
         let revision = try #require(
-            try await recorder.recordRevision(of: artifact, content: Data("anchor".utf8)))
+            try await recorder.recordRevision(
+                of: artifact, contentHash: ContentHash.digest(of: Data("anchor".utf8))
+            ) { Data("anchor".utf8) })
 
         #expect(try await contentStore.content(forRevision: revision.id) == Data("anchor".utf8))
     }
@@ -102,9 +118,15 @@ struct ArtifactRevisionRecordingTests {
         let recorder = ArtifactRevisionRecorder(
             journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
-        _ = try await recorder.recordRevision(of: artifact, content: Data("one".utf8))
-        _ = try await recorder.recordRevision(of: artifact, content: Data("two".utf8))
-        let third = try await recorder.recordRevision(of: artifact, content: Data("one".utf8))
+        _ = try await recorder.recordRevision(
+            of: artifact, contentHash: ContentHash.digest(of: Data("one".utf8))
+        ) { Data("one".utf8) }
+        _ = try await recorder.recordRevision(
+            of: artifact, contentHash: ContentHash.digest(of: Data("two".utf8))
+        ) { Data("two".utf8) }
+        let third = try await recorder.recordRevision(
+            of: artifact, contentHash: ContentHash.digest(of: Data("one".utf8))
+        ) { Data("one".utf8) }
 
         #expect(third != nil)
         #expect(await journal.recordedRevisions.count == 3)

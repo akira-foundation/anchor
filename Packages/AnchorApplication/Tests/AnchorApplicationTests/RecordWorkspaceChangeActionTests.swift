@@ -59,17 +59,17 @@ struct RecordWorkspaceChangeActionTests {
         #expect(await journal.recordedRevisions.isEmpty)
     }
 
-    @Test("only the artifacts named by the change are recorded")
-    func onlyTheArtifactsNamedByTheChangeAreRecorded() async throws {
-        let changed = "docs/superpowers/plans/00-indice.md"
-        let untouched = "docs/superpowers/specs/01-scaffold.md"
+    @Test("an artifact the change did not name is still recorded when it differs")
+    func anArtifactTheChangeDidNotNameIsStillRecordedWhenItDiffers() async throws {
+        let named = "docs/superpowers/plans/00-indice.md"
+        let unnamed = "docs/superpowers/specs/01-scaffold.md"
         let journal = RecordingRevisionJournal()
         let action = makeAction(
             discovering: [
-                try makeDiscovered(named: changed, content: Data("plan".utf8)),
-                try makeDiscovered(named: untouched, content: Data("spec".utf8)),
+                try makeDiscovered(named: named, content: Data("plan".utf8)),
+                try makeDiscovered(named: unnamed, content: Data("spec".utf8)),
             ],
-            content: [changed: Data("plan".utf8), untouched: Data("spec".utf8)],
+            content: [named: Data("plan".utf8), unnamed: Data("spec".utf8)],
             journal: journal
         )
 
@@ -77,12 +77,12 @@ struct RecordWorkspaceChangeActionTests {
             RecordWorkspaceChangeRequest(
                 device: developmentMac,
                 projectID: projectID,
-                change: WorkspaceChange(workspaceURL: workspaceURL, changedPaths: [changed])
+                change: WorkspaceChange(workspaceURL: workspaceURL, changedPaths: [named])
             )
         )
 
-        #expect(outcome == .recorded(revisionCount: 1))
-        #expect(await journal.recordedRevisions.count == 1)
+        #expect(outcome == .recorded(revisionCount: 2))
+        #expect(await journal.recordedRevisions.count == 2)
     }
 
     @Test("a change to content that did not actually change records nothing")

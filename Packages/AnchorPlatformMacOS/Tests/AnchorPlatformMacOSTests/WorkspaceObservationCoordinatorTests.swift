@@ -2,6 +2,7 @@ import AnchorApplication
 import AnchorDomain
 import AnchorProvider
 import AnchorStorage
+import AnchorSync
 import Foundation
 import Testing
 
@@ -15,7 +16,8 @@ struct WorkspaceObservationCoordinatorTests {
         device: Device,
         storage: InMemoryStorageProvider,
         checkpointStore: ObservationCheckpointStore,
-        workspaceURL: URL
+        workspaceURL: URL,
+        remote: InMemoryStorageProvider = InMemoryStorageProvider()
     ) -> (WorkspaceObservationCoordinator, StoredSyncOperationJournal) {
         let operationJournal = StoredSyncOperationJournal(storage: storage)
         let coordinator = WorkspaceObservationCoordinator(
@@ -34,10 +36,36 @@ struct WorkspaceObservationCoordinatorTests {
                     deviceID: device.id
                 ),
                 operationJournal: operationJournal
-            )
+            ),
+            synchronizer: makeSynchronizer(
+                storage: storage, remote: remote, operations: operationJournal)
         )
 
         return (coordinator, operationJournal)
+    }
+
+    private func makeSynchronizer(
+        storage: InMemoryStorageProvider,
+        remote: InMemoryStorageProvider,
+        operations: StoredSyncOperationJournal
+    ) -> ArtifactSynchronizer {
+        ArtifactSynchronizer(
+            local: makeRevisionStore(over: storage),
+            remote: makeRevisionStore(over: remote),
+            operations: operations,
+            failures: StorageFailureClassifier(),
+            feed: StoredRevisionFeed(storage: remote),
+            cursors: StoredSyncCursorStore(storage: storage),
+            divergences: StoredArtifactDivergenceJournal(storage: storage)
+        )
+    }
+
+    private func makeRevisionStore(over storage: InMemoryStorageProvider) -> RevisionStore {
+        RevisionStore(
+            journal: StoredArtifactRevisionJournal(
+                storage: storage, contentStore: StoredArtifactContentStore(storage: storage)),
+            contents: StoredArtifactContentStore(storage: storage)
+        )
     }
 
     @Test("starting recovers an operation the last run left uploading")
@@ -65,7 +93,7 @@ struct WorkspaceObservationCoordinatorTests {
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         await coordinator.stopObserving()
 
-        #expect(try await journal.currentState(of: interrupted.id) == .pending)
+        #expect(try await journal.history(of: interrupted.id).map(\.state).contains(.pending))
     }
 
     @Test("a device that cannot discover never starts observing")
@@ -96,40 +124,48 @@ struct WorkspaceObservationCoordinatorTests {
         #expect(try await journal.currentState(of: interrupted.id) == .uploading)
     }
 
-    @Test("an edit becomes a revision and a queued operation, and moves the checkpoint")
-    func anEditBecomesARevisionAndAQueuedOperation() async throws {
+    @Test("an edit reaches the other side, and moves the checkpoint")
+    func anEditReachesTheOtherSideAndMovesTheCheckpoint() async throws {
         let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "before"])
         let storage = InMemoryStorageProvider()
+        let remote = InMemoryStorageProvider()
         let checkpointStore = ObservationCheckpointStore(fileURL: makeCheckpointURL())
         let mac = Device(id: DeviceID(), displayName: "Studio", platform: .macOS)
-        let (coordinator, journal) = makeCoordinator(
-            device: mac, storage: storage, checkpointStore: checkpointStore, workspaceURL: workspace
+        let (coordinator, _) = makeCoordinator(
+            device: mac, storage: storage, checkpointStore: checkpointStore,
+            workspaceURL: workspace, remote: remote
         )
 
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         try await Task.sleep(for: .milliseconds(400))
         try Data("after".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
-        let queued = await pendingCount(in: journal, reaching: 1, within: .seconds(10))
+        let published = await publishedRevisionCount(
+            in: remote, reaching: 1, within: .seconds(10))
         await coordinator.stopObserving()
 
-        #expect(queued == 1)
+        #expect(published == 1)
         #expect(try checkpointStore.checkpoint(forWorkspaceAt: workspace) != nil)
     }
 
-    private func pendingCount(
-        in journal: StoredSyncOperationJournal,
+    private func publishedRevisionCount(
+        in remote: InMemoryStorageProvider,
         reaching target: Int,
-        within timeout: Duration
+        within limit: Duration
     ) async -> Int {
-        let deadline = ContinuousClock.now + timeout
+        let feed = StoredRevisionFeed(storage: remote)
+        let deadline = ContinuousClock.now.advanced(by: limit)
+        var seen = 0
+
         while ContinuousClock.now < deadline {
-            let count = (try? await journal.pendingOperations().count) ?? 0
-            if count >= target { return count }
-            try? await Task.sleep(for: .milliseconds(100))
+            seen = (try? await feed.revisions(after: nil).revisions.count) ?? 0
+
+            guard seen < target else { return seen }
+
+            try? await Task.sleep(for: .milliseconds(50))
         }
 
-        return (try? await journal.pendingOperations().count) ?? 0
+        return seen
     }
 
     private func makeCheckpointURL() -> URL {

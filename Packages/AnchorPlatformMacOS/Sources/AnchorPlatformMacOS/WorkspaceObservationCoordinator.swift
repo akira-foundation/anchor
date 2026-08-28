@@ -9,6 +9,7 @@ public actor WorkspaceObservationCoordinator {
     private let checkpointStore: ObservationCheckpointStore
     private let operationJournal: any SyncOperationJournal
     private let recordChange: RecordWorkspaceChangeAction
+    private let synchronizer: any ArtifactRevisionSynchronizing
     private var observationTask: Task<Void, Never>?
 
     public init(
@@ -16,13 +17,15 @@ public actor WorkspaceObservationCoordinator {
         observer: FileSystemEventObserver,
         checkpointStore: ObservationCheckpointStore,
         operationJournal: any SyncOperationJournal,
-        recordChange: RecordWorkspaceChangeAction
+        recordChange: RecordWorkspaceChangeAction,
+        synchronizer: any ArtifactRevisionSynchronizing
     ) {
         self.device = device
         self.observer = observer
         self.checkpointStore = checkpointStore
         self.operationJournal = operationJournal
         self.recordChange = recordChange
+        self.synchronizer = synchronizer
     }
 
     public func startObserving(
@@ -31,6 +34,7 @@ public actor WorkspaceObservationCoordinator {
         guard device.canDiscoverLocalProviders else { return }
 
         try await operationJournal.recoverInterruptedOperations()
+        try? await synchronizer.synchronizePendingArtifactRevisions()
 
         let checkpoint = try checkpointStore.checkpoint(forWorkspaceAt: workspaceURL)
         let changes = observer.observeWorkspaceChanges(at: workspaceURL, resumingFrom: checkpoint)
@@ -52,6 +56,8 @@ public actor WorkspaceObservationCoordinator {
         _ = try? await recordChange.perform(
             RecordWorkspaceChangeRequest(device: device, projectID: projectID, change: change)
         )
+
+        try? await synchronizer.synchronizePendingArtifactRevisions()
 
         guard let reached = await observer.latestCheckpoint() else { return }
 

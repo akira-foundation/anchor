@@ -1,6 +1,5 @@
+import AnchorApplication
 import Testing
-
-@testable import AnchorSync
 
 private actor CountingArtifactRevisionSynchronizer: ArtifactRevisionSynchronizing {
     private(set) var completedSynchronizationCount = 0

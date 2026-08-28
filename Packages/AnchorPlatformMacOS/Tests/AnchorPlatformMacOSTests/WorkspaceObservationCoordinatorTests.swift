@@ -26,8 +26,15 @@ struct WorkspaceObservationCoordinatorTests {
             checkpointStore: checkpointStore,
             operationJournal: operationJournal,
             recordChange: RecordWorkspaceChangeAction(
-                discoverer: SuperpowersArtifactProvider(workspaceURL: workspaceURL),
-                contentReader: WorkspaceFileContentReader(),
+                discoverer: CompositeArtifactDiscoverer([
+                    SuperpowersArtifactProvider(workspaceURL: workspaceURL),
+                    GraphifyArtifactProvider(workspaceURL: workspaceURL),
+                    ClaudeSessionProvider(workspaceURL: workspaceURL),
+                ]),
+                contentReader: CompositeArtifactContentReader([
+                    WorkspaceFileContentReader(),
+                    ClaudeSessionContentReader(projectID: projectID),
+                ]),
                 revisionRecorder: ArtifactRevisionRecorder(
                     journal: StoredArtifactRevisionJournal(
                         storage: storage, contentStore: StoredArtifactContentStore(storage: storage)

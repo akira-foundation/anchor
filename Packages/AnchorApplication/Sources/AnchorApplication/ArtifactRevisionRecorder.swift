@@ -18,11 +18,14 @@ public struct ArtifactRevisionRecorder: Sendable {
 
     public func recordRevision(
         of artifact: Artifact,
-        content: Data
+        contentHash: ContentHash,
+        readingContent: () async throws -> Data?
     ) async throws -> ArtifactRevision? {
-        let contentHash = ContentHash.digest(of: content)
         let latestRevision = try await journal.latestRevision(forArtifact: artifact.id)
         guard latestRevision?.contentHash != contentHash else { return nil }
+        guard let content = try await readingContent(),
+            ContentHash.digest(of: content) == contentHash
+        else { return nil }
 
         let revision = ArtifactRevision(
             id: RevisionID(),

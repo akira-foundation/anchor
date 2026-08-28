@@ -43,16 +43,16 @@ public struct RecordWorkspaceChangeAction: Action {
         guard request.device.canDiscoverLocalProviders else { return .deviceCannotDiscover }
 
         var recordedCount = 0
-        for discovered in try await changedArtifacts(in: request) {
-            let content = try await contentReader.readContent(
-                ofArtifactNamed: discovered.artifact.name,
-                inWorkspaceAt: request.change.workspaceURL
-            )
-            guard let content else { continue }
-
+        for discovered in try await discoverer.discoverArtifacts(forProject: request.projectID) {
             let revision = try await revisionRecorder.recordRevision(
-                of: discovered.artifact, content: content
-            )
+                of: discovered.artifact,
+                contentHash: discovered.contentHash
+            ) {
+                try await contentReader.readContent(
+                    ofArtifactNamed: discovered.artifact.name,
+                    inWorkspaceAt: request.change.workspaceURL
+                )
+            }
             guard let revision, let storageKey = StorageKey(rawValue: discovered.artifact.name)
             else {
                 continue
@@ -63,12 +63,5 @@ public struct RecordWorkspaceChangeAction: Action {
         }
 
         return .recorded(revisionCount: recordedCount)
-    }
-
-    private func changedArtifacts(
-        in request: RecordWorkspaceChangeRequest
-    ) async throws -> [DiscoveredArtifact] {
-        try await discoverer.discoverArtifacts(forProject: request.projectID)
-            .filter { request.change.changedPaths.contains($0.artifact.name) }
     }
 }

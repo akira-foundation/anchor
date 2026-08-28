@@ -47,11 +47,12 @@ public struct GraphifyArtifactProvider: ArtifactDiscovering, ArtifactClassifying
     ) -> DiscoveredArtifact? {
         guard let content = try? Data(contentsOf: fileURL(named: fileName)) else { return nil }
 
+        let name = "\(Self.outputDirectory)/\(fileName)"
         let artifact = Artifact(
-            id: ArtifactID(),
+            id: ArtifactID.derived(projectID: projectID, provider: .graphify, name: name),
             projectID: projectID,
             provider: .graphify,
-            name: "\(Self.outputDirectory)/\(fileName)",
+            name: name,
             retention: .latestRevisionOnly
         )
         guard let artifact else { return nil }

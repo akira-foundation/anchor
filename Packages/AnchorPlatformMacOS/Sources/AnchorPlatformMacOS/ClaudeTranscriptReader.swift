@@ -2,16 +2,6 @@ import AnchorDomain
 import AnchorProvider
 import Foundation
 
-public struct ClaudeTranscript: Sendable, Hashable {
-    public let session: AgentSession
-    public let messages: [ConversationMessage]
-
-    public init(session: AgentSession, messages: [ConversationMessage]) {
-        self.session = session
-        self.messages = messages
-    }
-}
-
 public struct ClaudeTranscriptReader: Sendable {
     private let redactor: SessionSecretRedactor
 
@@ -21,7 +11,7 @@ public struct ClaudeTranscriptReader: Sendable {
 
     public func transcripts(
         inLineDelimitedJSON text: String, forProject projectID: ProjectID
-    ) -> [ClaudeTranscript] {
+    ) -> [AgentTranscript] {
         let messagesBySession = Dictionary(
             grouping: text.split(separator: "\n").compactMap(conversationMessage(fromLine:)),
             by: \.message.sessionID
@@ -41,12 +31,12 @@ public struct ClaudeTranscriptReader: Sendable {
         forSession sessionID: SessionID,
         from entries: [(message: ConversationMessage, recordedAt: Date)],
         forProject projectID: ProjectID
-    ) -> ClaudeTranscript? {
+    ) -> AgentTranscript? {
         let instants = entries.map(\.recordedAt)
 
         guard let startedAt = instants.min(), let updatedAt = instants.max() else { return nil }
 
-        return ClaudeTranscript(
+        return AgentTranscript(
             session: AgentSession(
                 id: sessionID,
                 projectID: projectID,

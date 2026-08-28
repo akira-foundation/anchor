@@ -10,6 +10,8 @@ public actor WorkspaceObservationCoordinator {
     private let operationJournal: any SyncOperationJournal
     private let recordChange: RecordWorkspaceChangeAction
     private let synchronizer: any ArtifactRevisionSynchronizing
+    private let presences: any DevicePresenceRegistry
+    private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
 
     public init(
@@ -18,7 +20,9 @@ public actor WorkspaceObservationCoordinator {
         checkpointStore: ObservationCheckpointStore,
         operationJournal: any SyncOperationJournal,
         recordChange: RecordWorkspaceChangeAction,
-        synchronizer: any ArtifactRevisionSynchronizing
+        synchronizer: any ArtifactRevisionSynchronizing,
+        presences: any DevicePresenceRegistry,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.device = device
         self.observer = observer
@@ -26,6 +30,8 @@ public actor WorkspaceObservationCoordinator {
         self.operationJournal = operationJournal
         self.recordChange = recordChange
         self.synchronizer = synchronizer
+        self.presences = presences
+        self.now = now
     }
 
     public func startObserving(
@@ -34,6 +40,7 @@ public actor WorkspaceObservationCoordinator {
         guard device.canDiscoverLocalProviders else { return }
 
         try await operationJournal.recoverInterruptedOperations()
+        try? await announcePresence(onProject: projectID)
         try? await synchronizer.synchronizePendingArtifactRevisions()
 
         let checkpoint = try checkpointStore.checkpoint(forWorkspaceAt: workspaceURL)
@@ -52,11 +59,18 @@ public actor WorkspaceObservationCoordinator {
         await observer.stopObserving()
     }
 
+    private func announcePresence(onProject projectID: ProjectID) async throws {
+        try await presences.announcePresence(
+            DevicePresence(projectID: projectID, deviceID: device.id, lastSeenAt: now())
+        )
+    }
+
     private func handle(_ change: WorkspaceChange, forProject projectID: ProjectID) async {
         _ = try? await recordChange.perform(
             RecordWorkspaceChangeRequest(device: device, projectID: projectID, change: change)
         )
 
+        try? await announcePresence(onProject: projectID)
         try? await synchronizer.synchronizePendingArtifactRevisions()
 
         guard let reached = await observer.latestCheckpoint() else { return }

@@ -58,11 +58,12 @@ public struct SuperpowersArtifactProvider: ArtifactDiscovering {
     ) -> DiscoveredArtifact? {
         guard let content = try? Data(contentsOf: fileURL) else { return nil }
 
+        let name = "\(canonicalPath)/\(fileURL.lastPathComponent)"
         let artifact = Artifact(
-            id: ArtifactID(),
+            id: ArtifactID.derived(projectID: projectID, provider: .superpowers, name: name),
             projectID: projectID,
             provider: .superpowers,
-            name: "\(canonicalPath)/\(fileURL.lastPathComponent)"
+            name: name
         )
         guard let artifact else { return nil }
 

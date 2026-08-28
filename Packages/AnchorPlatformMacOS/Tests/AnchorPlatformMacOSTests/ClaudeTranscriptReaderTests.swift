@@ -1,5 +1,6 @@
 import AnchorDomain
 import AnchorPlatformMacOS
+import AnchorProvider
 import Foundation
 import Testing
 
@@ -169,5 +170,23 @@ struct ClaudeTranscriptReaderTests {
             reader.transcripts(inLineDelimitedJSON: text, forProject: projectID).first)
 
         #expect(transcript.messages.map(\.content) == ["before", "after"])
+    }
+}
+
+@Suite("Artifact identity across discoveries")
+struct ProviderArtifactIdentityTests {
+    @Test("discovering the same file twice names the same artifact")
+    func discoveringTheSameFileTwiceNamesTheSameArtifact() async throws {
+        let workspace = try WorkspaceFixture.make([
+            "docs/superpowers/plans/00-indice.md": "plan"
+        ])
+        let projectID = ProjectID()
+        let provider = SuperpowersArtifactProvider(workspaceURL: workspace)
+
+        let first = try await provider.discoverArtifacts(forProject: projectID)
+        let second = try await provider.discoverArtifacts(forProject: projectID)
+
+        #expect(first.map(\.artifact.id) == second.map(\.artifact.id))
+        #expect(first.isEmpty == false)
     }
 }

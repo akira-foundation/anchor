@@ -73,7 +73,7 @@ struct ArtifactSynchronizerReceiveTests {
         ).synchronizePendingArtifactRevisions()
 
         #expect(try await local.journal.revision(withIdentifier: next.id) == next)
-        #expect(try await divergences.pendingDivergences().isEmpty)
+        #expect(try await divergences.divergences().isEmpty)
     }
 
     @Test("a revision that forks the local history is recorded and not applied")
@@ -96,7 +96,7 @@ struct ArtifactSynchronizerReceiveTests {
 
         #expect(try await local.journal.revision(withIdentifier: theirs.id) == nil)
 
-        let recorded = try #require(try await divergences.pendingDivergences().first)
+        let recorded = try #require(try await divergences.divergences().first)
 
         #expect(recorded.artifactID == artifactID)
         #expect(recorded.localRevisionID == ours.id)
@@ -161,6 +161,120 @@ struct ArtifactSynchronizerReceiveTests {
         ).synchronizePendingArtifactRevisions()
 
         #expect(try await local.journal.revision(withIdentifier: child.id) == child)
-        #expect(try await divergences.pendingDivergences().isEmpty)
+        #expect(try await divergences.divergences().isEmpty)
+    }
+
+    @Test("a fork keeps the other side's bytes on this machine")
+    func aForkKeepsTheOtherSidesBytesOnThisMachine() async throws {
+        let local = makeStore()
+        let remote = makeStore()
+        let artifactID = ArtifactID()
+        let base = try makeRevision(artifactID: artifactID, contents: "base")
+        let ours = try makeRevision(artifactID: artifactID, parent: base.id, contents: "ours")
+        try await local.journal.recordRevision(base)
+        try await local.journal.recordRevision(ours)
+        let theirs = try makeRevision(artifactID: artifactID, parent: base.id, contents: "theirs")
+        try await publish(theirs, contents: "theirs", to: remote)
+
+        try await makeSynchronizer(
+            local: local, remote: remote,
+            feed: StubRemoteRevisionFeed(
+                pages: [nil: RemoteRevisionPage(revisions: [theirs], cursor: "page-1")])
+        ).synchronizePendingArtifactRevisions()
+
+        #expect(
+            try await local.contents.content(forRevision: theirs.id) == Data("theirs".utf8))
+        #expect(try await local.journal.latestRevision(forArtifact: artifactID)?.id == ours.id)
+    }
+
+    @Test("a fork already recorded is not detected again")
+    func aForkAlreadyRecordedIsNotDetectedAgain() async throws {
+        let local = makeStore()
+        let remote = makeStore()
+        let artifactID = ArtifactID()
+        let base = try makeRevision(artifactID: artifactID, contents: "base")
+        let ours = try makeRevision(artifactID: artifactID, parent: base.id, contents: "ours")
+        try await local.journal.recordRevision(base)
+        try await local.journal.recordRevision(ours)
+        let theirs = try makeRevision(artifactID: artifactID, parent: base.id, contents: "theirs")
+        try await publish(theirs, contents: "theirs", to: remote)
+        let feed = StubRemoteRevisionFeed(
+            pages: [nil: RemoteRevisionPage(revisions: [theirs], cursor: nil)])
+
+        try await makeSynchronizer(local: local, remote: remote, feed: feed)
+            .synchronizePendingArtifactRevisions()
+        try await makeSynchronizer(local: local, remote: remote, feed: feed)
+            .synchronizePendingArtifactRevisions()
+
+        #expect(try await divergences.divergences().count == 1)
+    }
+
+    @Test("the same content on both sides converges instead of conflicting")
+    func theSameContentOnBothSidesConvergesInsteadOfConflicting() async throws {
+        let local = makeStore()
+        let remote = makeStore()
+        let artifactID = ArtifactID()
+        let ours = try makeRevision(artifactID: artifactID, contents: "same")
+        try await local.journal.recordRevision(ours)
+        let theirs = try makeRevision(artifactID: artifactID, contents: "same")
+        try await publish(theirs, contents: "same", to: remote)
+
+        try await makeSynchronizer(
+            local: local, remote: remote,
+            feed: StubRemoteRevisionFeed(
+                pages: [nil: RemoteRevisionPage(revisions: [theirs], cursor: nil)])
+        ).synchronizePendingArtifactRevisions()
+
+        let recorded = try #require(try await divergences.divergences().first)
+
+        #expect(recorded.resolution == .convergedOnIdenticalContent)
+        #expect(try await local.contents.content(forRevision: theirs.id) == nil)
+    }
+
+    @Test("two first revisions made at once are a conflict, not a replacement")
+    func twoFirstRevisionsMadeAtOnceAreAConflictNotAReplacement() async throws {
+        let local = makeStore()
+        let remote = makeStore()
+        let artifactID = ArtifactID()
+        let ours = try makeRevision(artifactID: artifactID, contents: "ours")
+        try await local.journal.recordRevision(ours)
+        let theirs = try makeRevision(artifactID: artifactID, contents: "theirs")
+        try await publish(theirs, contents: "theirs", to: remote)
+
+        try await makeSynchronizer(
+            local: local, remote: remote,
+            feed: StubRemoteRevisionFeed(
+                pages: [nil: RemoteRevisionPage(revisions: [theirs], cursor: nil)])
+        ).synchronizePendingArtifactRevisions()
+
+        let recorded = try #require(try await divergences.divergences().first)
+
+        #expect(recorded.resolution == .awaitingDecision)
+        #expect(try await local.journal.latestRevision(forArtifact: artifactID)?.id == ours.id)
+        #expect(try await local.contents.content(forRevision: theirs.id) == Data("theirs".utf8))
+    }
+
+    @Test("a continuation of a single revision artifact is applied, not conflicted")
+    func aContinuationOfASingleRevisionArtifactIsAppliedNotConflicted() async throws {
+        let local = makeStore()
+        let remote = makeStore()
+        let artifactID = ArtifactID()
+        let ours = try makeRevision(
+            artifactID: artifactID, contents: "ours", retention: .latestRevisionOnly)
+        try await local.journal.recordRevision(ours)
+        let theirs = try makeRevision(
+            artifactID: artifactID, parent: ours.id, contents: "theirs",
+            retention: .latestRevisionOnly
+        )
+        try await publish(theirs, contents: "theirs", to: remote)
+
+        try await makeSynchronizer(
+            local: local, remote: remote,
+            feed: StubRemoteRevisionFeed(
+                pages: [nil: RemoteRevisionPage(revisions: [theirs], cursor: nil)])
+        ).synchronizePendingArtifactRevisions()
+
+        #expect(try await local.journal.revision(withIdentifier: theirs.id) == theirs)
+        #expect(try await divergences.divergences().isEmpty)
     }
 }

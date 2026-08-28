@@ -28,13 +28,14 @@ struct StoredSyncPortsTests {
             artifactID: ArtifactID(),
             localRevisionID: RevisionID(),
             remoteRevisionID: RevisionID(),
+            resolution: .awaitingDecision,
             detectedAt: Date(timeIntervalSince1970: 0)
         )
 
         try await StoredArtifactDivergenceJournal(storage: storage).recordDivergence(divergence)
 
         #expect(
-            try await StoredArtifactDivergenceJournal(storage: storage).pendingDivergences()
+            try await StoredArtifactDivergenceJournal(storage: storage).divergences()
                 == [divergence])
     }
 

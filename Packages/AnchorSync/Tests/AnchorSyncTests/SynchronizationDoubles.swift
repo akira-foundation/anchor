@@ -57,7 +57,8 @@ struct StubFailureClassifier: SyncFailureClassifying {
 func makeRevision(
     artifactID: ArtifactID = ArtifactID(),
     parent: RevisionID? = nil,
-    contents: String
+    contents: String,
+    retention: ArtifactRetention = .fullHistory
 ) throws -> ArtifactRevision {
     guard
         let revision = ArtifactRevision(
@@ -66,7 +67,8 @@ func makeRevision(
             parentRevisionID: parent,
             contentHash: ContentHash.digest(of: Data(contents.utf8)),
             deviceID: DeviceID(),
-            createdAt: Date(timeIntervalSince1970: 0)
+            createdAt: Date(timeIntervalSince1970: 0),
+            retention: retention
         )
     else { throw StubFailure(isTransient: false) }
 
@@ -100,5 +102,5 @@ actor InMemoryDivergenceJournal: ArtifactDivergenceJournal {
         recorded.append(divergence)
     }
 
-    func pendingDivergences() async throws -> [ArtifactDivergence] { recorded }
+    func divergences() async throws -> [ArtifactDivergence] { recorded }
 }

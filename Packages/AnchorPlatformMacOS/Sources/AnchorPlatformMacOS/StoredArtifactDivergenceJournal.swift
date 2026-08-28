@@ -21,7 +21,7 @@ public struct StoredArtifactDivergenceJournal: ArtifactDivergenceJournal {
         )
     }
 
-    public func pendingDivergences() async throws -> [ArtifactDivergence] {
+    public func divergences() async throws -> [ArtifactDivergence] {
         guard let prefix = StorageKey(rawValue: Self.divergencesPrefix) else { return [] }
 
         var found: [ArtifactDivergence] = []

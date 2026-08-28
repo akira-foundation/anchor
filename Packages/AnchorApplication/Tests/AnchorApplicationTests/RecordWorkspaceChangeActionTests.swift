@@ -133,6 +133,10 @@ private actor RecordingRevisionJournal: ArtifactRevisionJournal {
         recordedRevisions.last { $0.artifactID == artifactID }
     }
 
+    func revision(withIdentifier revisionID: RevisionID) async throws -> ArtifactRevision? {
+        recordedRevisions.first { $0.id == revisionID }
+    }
+
     func recordRevision(_ revision: ArtifactRevision) async throws {
         recordedRevisions.append(revision)
     }

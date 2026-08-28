@@ -22,6 +22,20 @@ public struct StoredArtifactRevisionJournal: ArtifactRevisionJournal {
         return recorded.first { !claimedParents.contains($0.id) }
     }
 
+    public func revision(
+        withIdentifier revisionID: RevisionID
+    ) async throws -> ArtifactRevision? {
+        for metadata in try await storage.listObjects(withPrefix: revisionsPrefixKey()) {
+            guard metadata.key.rawValue.hasSuffix("/\(revisionID.rawValue)"),
+                let stored = try await storage.object(for: metadata.key)
+            else { continue }
+
+            return try? JSONDecoder().decode(ArtifactRevision.self, from: stored.object.contents)
+        }
+
+        return nil
+    }
+
     public func recordRevision(_ revision: ArtifactRevision) async throws {
         let contents = try JSONEncoder().encode(revision)
         guard let key = storageKey(for: revision) else { return }
@@ -70,6 +84,10 @@ public struct StoredArtifactRevisionJournal: ArtifactRevisionJournal {
             try await storage.deleteObject(for: key)
             try await contentStore.dropContent(forRevision: revision.id)
         }
+    }
+
+    private func revisionsPrefixKey() -> StorageKey? {
+        StorageKey(rawValue: Self.revisionsPrefix)
     }
 
     private func artifactPrefix(for artifactID: ArtifactID) -> StorageKey? {

@@ -22,7 +22,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorSyncTests",
-            dependencies: ["AnchorSync"]
+            dependencies: [
+                "AnchorSync",
+                .product(name: "AnchorApplicationTestSupport", package: "AnchorApplication"),
+            ]
         ),
     ]
 )

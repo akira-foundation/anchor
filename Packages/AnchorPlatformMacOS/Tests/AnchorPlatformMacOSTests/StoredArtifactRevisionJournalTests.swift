@@ -29,15 +29,20 @@ struct StoredArtifactRevisionJournalTests {
         let storage = InMemoryStorageProvider()
         let revision = try makeRevision(contents: "one")
 
-        try await StoredArtifactRevisionJournal(storage: storage).recordRevision(revision)
+        try await StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage)
+        ).recordRevision(revision)
 
-        let reopened = StoredArtifactRevisionJournal(storage: storage)
+        let reopened = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
         #expect(try await reopened.latestRevision(forArtifact: artifactID)?.id == revision.id)
     }
 
     @Test("an artifact with no revisions has no latest one")
     func anArtifactWithNoRevisionsHasNoLatestOne() async throws {
-        let journal = StoredArtifactRevisionJournal(storage: InMemoryStorageProvider())
+        let storage = InMemoryStorageProvider()
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
 
         #expect(try await journal.latestRevision(forArtifact: ArtifactID()) == nil)
     }
@@ -45,7 +50,8 @@ struct StoredArtifactRevisionJournalTests {
     @Test("full history keeps every revision that was recorded")
     func fullHistoryKeepsEveryRevisionThatWasRecorded() async throws {
         let storage = InMemoryStorageProvider()
-        let journal = StoredArtifactRevisionJournal(storage: storage)
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
         let first = try makeRevision(contents: "one")
         let second = try makeRevision(parent: first.id, contents: "two")
 
@@ -59,7 +65,8 @@ struct StoredArtifactRevisionJournalTests {
     @Test("a revision without ancestry drops the ones it superseded")
     func aRevisionWithoutAncestryDropsTheOnesItSuperseded() async throws {
         let storage = InMemoryStorageProvider()
-        let journal = StoredArtifactRevisionJournal(storage: storage)
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
         let first = try makeRevision(contents: "one")
         let second = try makeRevision(contents: "two")
 
@@ -73,7 +80,8 @@ struct StoredArtifactRevisionJournalTests {
     @Test("dropping one artifact ancestry leaves another artifact untouched")
     func droppingOneArtifactAncestryLeavesAnotherUntouched() async throws {
         let storage = InMemoryStorageProvider()
-        let journal = StoredArtifactRevisionJournal(storage: storage)
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
         let otherArtifact = ArtifactID()
         let kept = try #require(
             ArtifactRevision(
@@ -95,7 +103,8 @@ extension StoredArtifactRevisionJournalTests {
     @Test("the latest revision follows ancestry, not the clock")
     func theLatestRevisionFollowsAncestryNotTheClock() async throws {
         let storage = InMemoryStorageProvider()
-        let journal = StoredArtifactRevisionJournal(storage: storage)
+        let journal = StoredArtifactRevisionJournal(
+            storage: storage, contentStore: StoredArtifactContentStore(storage: storage))
         let older = try #require(
             ArtifactRevision(
                 id: RevisionID(), artifactID: artifactID, parentRevisionID: nil,
@@ -115,5 +124,22 @@ extension StoredArtifactRevisionJournalTests {
         try await journal.recordRevision(newer)
 
         #expect(try await journal.latestRevision(forArtifact: artifactID)?.id == newer.id)
+    }
+
+    @Test("retention that drops a revision drops its content with it")
+    func retentionThatDropsARevisionDropsItsContentWithIt() async throws {
+        let storage = InMemoryStorageProvider()
+        let contentStore = StoredArtifactContentStore(storage: storage)
+        let journal = StoredArtifactRevisionJournal(storage: storage, contentStore: contentStore)
+        let superseded = try makeRevision(contents: "superseded")
+        let latest = try makeRevision(contents: "latest")
+
+        try await contentStore.storeContent(Data("superseded".utf8), forRevision: superseded.id)
+        try await journal.recordRevision(superseded)
+        try await contentStore.storeContent(Data("latest".utf8), forRevision: latest.id)
+        try await journal.recordRevision(latest)
+
+        #expect(try await contentStore.content(forRevision: superseded.id) == nil)
+        #expect(try await contentStore.content(forRevision: latest.id) == Data("latest".utf8))
     }
 }

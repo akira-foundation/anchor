@@ -27,7 +27,11 @@ struct WorkspaceObservationCoordinatorTests {
                 discoverer: SuperpowersArtifactProvider(workspaceURL: workspaceURL),
                 contentReader: WorkspaceFileContentReader(),
                 revisionRecorder: ArtifactRevisionRecorder(
-                    journal: StoredArtifactRevisionJournal(storage: storage), deviceID: device.id
+                    journal: StoredArtifactRevisionJournal(
+                        storage: storage, contentStore: StoredArtifactContentStore(storage: storage)
+                    ),
+                    contentStore: StoredArtifactContentStore(storage: storage),
+                    deviceID: device.id
                 ),
                 operationJournal: operationJournal
             )

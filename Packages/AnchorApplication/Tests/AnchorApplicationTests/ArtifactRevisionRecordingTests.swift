@@ -22,7 +22,8 @@ struct ArtifactRevisionRecordingTests {
         let artifact = try makeArtifact()
         let content = Data("unchanged".utf8)
         let journal = RecordingRevisionJournal()
-        let recorder = ArtifactRevisionRecorder(journal: journal, deviceID: deviceID)
+        let recorder = ArtifactRevisionRecorder(
+            journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         _ = try await recorder.recordRevision(of: artifact, content: content)
         let second = try await recorder.recordRevision(of: artifact, content: content)
@@ -35,7 +36,8 @@ struct ArtifactRevisionRecordingTests {
     func changedContentRecordsARevisionWhoseParentIsTheOneBeforeIt() async throws {
         let artifact = try makeArtifact()
         let journal = RecordingRevisionJournal()
-        let recorder = ArtifactRevisionRecorder(journal: journal, deviceID: deviceID)
+        let recorder = ArtifactRevisionRecorder(
+            journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         let first = try #require(
             try await recorder.recordRevision(of: artifact, content: Data("one".utf8)))
@@ -50,7 +52,8 @@ struct ArtifactRevisionRecordingTests {
     func aDerivableArtifactKeepsNoAncestry() async throws {
         let artifact = try makeArtifact(retention: .latestRevisionOnly)
         let journal = RecordingRevisionJournal()
-        let recorder = ArtifactRevisionRecorder(journal: journal, deviceID: deviceID)
+        let recorder = ArtifactRevisionRecorder(
+            journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         _ = try await recorder.recordRevision(of: artifact, content: Data("one".utf8))
         let second = try #require(
@@ -64,7 +67,10 @@ struct ArtifactRevisionRecordingTests {
         let artifact = try makeArtifact()
         let content = Data("body".utf8)
         let recorder = ArtifactRevisionRecorder(
-            journal: RecordingRevisionJournal(), deviceID: deviceID)
+            journal: RecordingRevisionJournal(),
+            contentStore: InMemoryArtifactContentStore(),
+            deviceID: deviceID
+        )
 
         let revision = try #require(
             try await recorder.recordRevision(of: artifact, content: content))
@@ -74,11 +80,25 @@ struct ArtifactRevisionRecordingTests {
         #expect(revision.artifactID == artifact.id)
     }
 
+    @Test("the bytes a revision promises are kept when the revision is recorded")
+    func bytesARevisionPromisesAreKeptWhenTheRevisionIsRecorded() async throws {
+        let artifact = try makeArtifact()
+        let contentStore = InMemoryArtifactContentStore()
+        let recorder = ArtifactRevisionRecorder(
+            journal: RecordingRevisionJournal(), contentStore: contentStore, deviceID: deviceID)
+
+        let revision = try #require(
+            try await recorder.recordRevision(of: artifact, content: Data("anchor".utf8)))
+
+        #expect(try await contentStore.content(forRevision: revision.id) == Data("anchor".utf8))
+    }
+
     @Test("content that returns to an earlier value still counts as a change")
     func contentThatReturnsToAnEarlierValueStillCountsAsAChange() async throws {
         let artifact = try makeArtifact()
         let journal = RecordingRevisionJournal()
-        let recorder = ArtifactRevisionRecorder(journal: journal, deviceID: deviceID)
+        let recorder = ArtifactRevisionRecorder(
+            journal: journal, contentStore: InMemoryArtifactContentStore(), deviceID: deviceID)
 
         _ = try await recorder.recordRevision(of: artifact, content: Data("one".utf8))
         _ = try await recorder.recordRevision(of: artifact, content: Data("two".utf8))

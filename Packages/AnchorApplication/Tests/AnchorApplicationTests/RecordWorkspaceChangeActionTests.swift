@@ -20,7 +20,10 @@ struct RecordWorkspaceChangeActionTests {
             discoverer: StubDiscoverer(artifacts: artifacts),
             contentReader: StubContentReader(contentByName: content),
             revisionRecorder: ArtifactRevisionRecorder(
-                journal: journal, deviceID: developmentMac.id),
+                journal: journal,
+                contentStore: InMemoryArtifactContentStore(),
+                deviceID: developmentMac.id
+            ),
             operationJournal: AppendOnlySyncOperationJournal()
         )
     }

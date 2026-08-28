@@ -6,7 +6,9 @@ let package = Package(
     name: "AnchorApplication",
     platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
-        .library(name: "AnchorApplication", targets: ["AnchorApplication"])
+        .library(name: "AnchorApplication", targets: ["AnchorApplication"]),
+        .library(
+            name: "AnchorApplicationTestSupport", targets: ["AnchorApplicationTestSupport"]),
     ],
     dependencies: [
         .package(path: "../AnchorDomain"),
@@ -20,9 +22,16 @@ let package = Package(
                 .product(name: "AnchorProvider", package: "AnchorProvider"),
             ]
         ),
+        .target(
+            name: "AnchorApplicationTestSupport",
+            dependencies: [
+                "AnchorApplication",
+                .product(name: "AnchorDomain", package: "AnchorDomain"),
+            ]
+        ),
         .testTarget(
             name: "AnchorApplicationTests",
-            dependencies: ["AnchorApplication"]
+            dependencies: ["AnchorApplication", "AnchorApplicationTestSupport"]
         ),
     ]
 )

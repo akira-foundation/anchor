@@ -7,9 +7,11 @@ public struct StoredArtifactRevisionJournal: ArtifactRevisionJournal {
     private static let revisionsPrefix = "revisions"
 
     private let storage: any StorageProvider
+    private let contentStore: any ArtifactContentStore
 
-    public init(storage: any StorageProvider) {
+    public init(storage: any StorageProvider, contentStore: any ArtifactContentStore) {
         self.storage = storage
+        self.contentStore = contentStore
     }
 
     public func latestRevision(forArtifact artifactID: ArtifactID) async throws -> ArtifactRevision?
@@ -61,13 +63,12 @@ public struct StoredArtifactRevisionJournal: ArtifactRevisionJournal {
         forArtifact artifactID: ArtifactID,
         exceptRevisionWithIdentifier keptRevisionID: RevisionID
     ) async throws {
-        guard let prefix = artifactPrefix(for: artifactID) else { return }
+        for revision in try await revisions(forArtifact: artifactID)
+        where revision.id != keptRevisionID {
+            guard let key = storageKey(for: revision) else { continue }
 
-        for metadata in try await storage.listObjects(withPrefix: prefix) {
-            guard metadata.key.rawValue.hasSuffix("/\(keptRevisionID.rawValue)") == false else {
-                continue
-            }
-            try await storage.deleteObject(for: metadata.key)
+            try await storage.deleteObject(for: key)
+            try await contentStore.dropContent(forRevision: revision.id)
         }
     }
 

@@ -26,7 +26,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorPlatformMacOSTests",
-            dependencies: ["AnchorPlatformMacOS"]
+            dependencies: [
+                "AnchorPlatformMacOS",
+                .product(name: "AnchorApplicationTestSupport", package: "AnchorApplication"),
+            ]
         ),
     ]
 )

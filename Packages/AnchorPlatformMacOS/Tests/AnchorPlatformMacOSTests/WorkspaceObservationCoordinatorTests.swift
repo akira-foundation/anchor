@@ -30,10 +30,12 @@ struct WorkspaceObservationCoordinatorTests {
                     SuperpowersArtifactProvider(workspaceURL: workspaceURL),
                     GraphifyArtifactProvider(workspaceURL: workspaceURL),
                     ClaudeSessionProvider(workspaceURL: workspaceURL),
+                    CodexSessionProvider(workspaceURL: workspaceURL),
                 ]),
                 contentReader: CompositeArtifactContentReader([
                     WorkspaceFileContentReader(),
                     ClaudeSessionContentReader(projectID: projectID),
+                    CodexSessionContentReader(projectID: projectID),
                 ]),
                 revisionRecorder: ArtifactRevisionRecorder(
                     journal: StoredArtifactRevisionJournal(

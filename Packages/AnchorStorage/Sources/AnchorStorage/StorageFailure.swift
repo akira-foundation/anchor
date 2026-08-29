@@ -5,4 +5,5 @@ public enum StorageFailure: Error, Sendable, Equatable {
     case transportUnavailable
     case accountUnavailable
     case quotaExceeded
+    case contentUnreadable(StorageKey)
 }

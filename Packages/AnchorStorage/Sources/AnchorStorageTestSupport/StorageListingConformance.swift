@@ -54,9 +54,20 @@ func verifyMetadataReportsTheStoredByteSize<Provider: StorageProvider>(
     let provider = await makeProvider()
 
     try await provider.putObject(
-        try makeStorageObject("projects/anchor/index", contents: "anchor"),
+        try makeStorageObject("projects/anchor/small", contents: "anchor"),
+        precondition: .none
+    )
+    try await provider.putObject(
+        try makeStorageObject(
+            "projects/anchor/large", contents: String(repeating: "anchor", count: 100)),
         precondition: .none
     )
 
-    #expect(try await provider.listObjects(withPrefix: nil).first?.byteSize == 6)
+    let sizes = try await provider.listObjects(withPrefix: nil)
+        .sorted { $0.key.rawValue < $1.key.rawValue }
+        .map(\.byteSize)
+
+    #expect(sizes.count == 2)
+    #expect(sizes.first ?? 0 > 0)
+    #expect((sizes.first ?? 0) > (sizes.last ?? 0))
 }

@@ -10,7 +10,7 @@ public struct StorageFailureClassifier: SyncFailureClassifying {
         switch storageFailure {
         case .transportUnavailable:
             return true
-        case .preconditionFailed, .accountUnavailable, .quotaExceeded:
+        case .preconditionFailed, .accountUnavailable, .quotaExceeded, .contentUnreadable:
             return false
         }
     }

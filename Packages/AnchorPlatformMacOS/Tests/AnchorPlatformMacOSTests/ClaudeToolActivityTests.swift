@@ -133,4 +133,57 @@ struct ClaudeToolActivityTests {
 
         #expect(first?.toolActivities.map(\.id) == second?.toolActivities.map(\.id))
     }
+
+    @Test("a huge command output arrives abridged")
+    func aHugeCommandOutputArrivesAbridged() throws {
+        let output = (1...3000).map { "line \($0) of build output" }.joined(separator: "\n")
+        let text = [
+            callLine(id: "toolu_1", name: "Bash", input: ["command": "swift build"]),
+            resultLine(id: "toolu_1", output: output, failed: false),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcripts(inLineDelimitedJSON: text, forProject: projectID).first)
+        let outcome = try #require(transcript.toolActivities.first?.outcome)
+
+        #expect(outcome.utf8.count < output.utf8.count)
+        #expect(outcome.hasPrefix("line 1 of build output"))
+        #expect(outcome.contains("[omitted "))
+    }
+
+    @Test("a screenshot result becomes a description instead of its bytes")
+    func aScreenshotResultBecomesADescriptionInsteadOfItsBytes() throws {
+        let encoded = String(repeating: "iVBORw0KGgo", count: 5000)
+        let text = [
+            callLine(id: "toolu_1", name: "control", input: ["action": "screenshot"]),
+            line([
+                "type": "user", "sessionId": session, "uuid": UUID().uuidString,
+                "timestamp": "2026-08-08T18:20:30.000Z",
+                "message": [
+                    "role": "user",
+                    "content": [
+                        [
+                            "type": "tool_result", "tool_use_id": "toolu_1",
+                            "content": [
+                                [
+                                    "type": "image",
+                                    "source": [
+                                        "type": "base64", "media_type": "image/png",
+                                        "data": encoded,
+                                    ],
+                                ]
+                            ],
+                        ]
+                    ],
+                ],
+            ]),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcripts(inLineDelimitedJSON: text, forProject: projectID).first)
+        let outcome = try #require(transcript.toolActivities.first?.outcome)
+
+        #expect(outcome == "[image omitted: image/png, 55000 encoded bytes]")
+        #expect(outcome.contains("iVBORw0KGgo") == false)
+    }
 }

@@ -14,6 +14,7 @@ let package = Package(
         .package(path: "../AnchorProvider"),
         .package(path: "../AnchorStorage"),
         .package(path: "../AnchorSync"),
+        .package(path: "../AnchorPersistence"),
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
                 .product(name: "AnchorApplication", package: "AnchorApplication"),
                 .product(name: "AnchorProvider", package: "AnchorProvider"),
                 .product(name: "AnchorStorage", package: "AnchorStorage"),
+                .product(name: "AnchorPersistence", package: "AnchorPersistence"),
             ]
         ),
         .testTarget(

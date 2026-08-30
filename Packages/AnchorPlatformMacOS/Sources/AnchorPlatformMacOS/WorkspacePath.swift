@@ -1,6 +1,13 @@
 import Foundation
 
-enum WorkspacePath {
+public enum WorkspacePath {
+    public static func comparable(_ url: URL) -> String {
+        let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
+            .path(percentEncoded: false)
+
+        return resolved.hasSuffix("/") ? String(resolved.dropLast()) : resolved
+    }
+
     static func relativePath(of absolutePath: String, under workspaceURL: URL) -> String? {
         let root = canonicalPath(workspaceURL.resolvingSymlinksInPath().path())
         let prefix = root.hasSuffix("/") ? root : root + "/"

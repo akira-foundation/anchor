@@ -9,13 +9,15 @@ let package = Package(
         .library(name: "AnchorSearch", targets: ["AnchorSearch"])
     ],
     dependencies: [
-        .package(path: "../AnchorDomain")
+        .package(path: "../AnchorDomain"),
+        .package(path: "../AnchorPersistence"),
     ],
     targets: [
         .target(
             name: "AnchorSearch",
             dependencies: [
-                .product(name: "AnchorDomain", package: "AnchorDomain")
+                .product(name: "AnchorDomain", package: "AnchorDomain"),
+                .product(name: "AnchorPersistence", package: "AnchorPersistence"),
             ]
         ),
         .testTarget(

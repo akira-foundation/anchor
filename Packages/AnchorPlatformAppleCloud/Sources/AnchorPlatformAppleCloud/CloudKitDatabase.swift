@@ -154,18 +154,29 @@ public actor CloudKitDatabase: CloudRecordDatabase {
         deleting recordIDs: [CKRecord.ID],
         savePolicy: CKModifyRecordsOperation.RecordSavePolicy
     ) async throws(CloudDatabaseFailure) -> [CKRecord] {
+        let results:
+            (
+                saveResults: [CKRecord.ID: Result<CKRecord, any Error>],
+                deleteResults: [CKRecord.ID: Result<Void, any Error>]
+            )
+
         do {
-            let results = try await database.modifyRecords(
+            results = try await database.modifyRecords(
                 saving: records,
                 deleting: recordIDs,
                 savePolicy: savePolicy,
                 atomically: true
             )
-
-            return try results.saveResults.values.map { try $0.get() }
         } catch {
             throw CloudKitFailureMapping.failure(from: error)
         }
+
+        guard
+            let failure = CloudKitFailureMapping.failure(
+                explainingSaves: results.saveResults, deletes: results.deleteResults)
+        else { return results.saveResults.values.compactMap { try? $0.get() } }
+
+        throw failure
     }
 
     private func enumerateZone() async throws(CloudDatabaseFailure) -> [CKRecord] {

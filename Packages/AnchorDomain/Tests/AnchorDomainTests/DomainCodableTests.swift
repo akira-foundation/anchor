@@ -96,6 +96,7 @@ struct DomainCodableTests {
                 kind: .architecture,
                 summaryText: "AnchorDomain depends only on AnchorFoundation",
                 source: .session(SessionID(), messageIDs: [MessageID()]),
+                sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
                 createdAt: Self.fixedDate
             )
         )
@@ -178,6 +179,7 @@ struct DomainOptionalFieldCodableTests {
                 kind: .decision,
                 summaryText: "SQLite backs the local index",
                 source: .artifact(ArtifactID()),
+                sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
                 createdAt: Self.fixedDate
             )
         )

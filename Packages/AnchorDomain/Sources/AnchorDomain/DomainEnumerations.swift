@@ -18,6 +18,11 @@ public enum ConversationRole: String, Sendable, Codable {
     case tool
 }
 
+public enum KnowledgeEntryState: String, Sendable, Codable {
+    case current
+    case superseded
+}
+
 public enum KnowledgeEntryKind: String, Sendable, Codable {
     case summary
     case decision

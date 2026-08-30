@@ -1,3 +1,4 @@
+import AnchorApplication
 import AnchorDomain
 import AnchorPlatformMacOS
 import Foundation
@@ -185,5 +186,27 @@ struct ClaudeToolActivityTests {
 
         #expect(outcome == "[image omitted: image/png, 55000 encoded bytes]")
         #expect(outcome.contains("iVBORw0KGgo") == false)
+    }
+}
+
+@Suite("Knowledge carries the digest of what it came from")
+struct ClassifiedKnowledgeSourceTests {
+    @Test("a classified entry reports the digest of the artifact it read")
+    func aClassifiedEntryReportsTheDigestOfTheArtifactItRead() async throws {
+        let workspace = try WorkspaceFixture.make([
+            "docs/superpowers/plans/00-indice.md": "Plan index for Anchor"
+        ])
+        let provider = SuperpowersArtifactProvider(workspaceURL: workspace)
+        let discovered = try #require(
+            try await provider.discoverArtifacts(forProject: ProjectID()).first)
+        let content = try #require(
+            try await WorkspaceFileContentReader().readContent(
+                ofArtifactNamed: discovered.artifact.name, inWorkspaceAt: workspace))
+
+        let entries = try await provider.classifyKnowledgeEntries(
+            in: discovered, content: content)
+
+        #expect(entries.first?.sourceContentHash == discovered.contentHash)
+        #expect(entries.first?.sourceContentHash == ContentHash.digest(of: content))
     }
 }

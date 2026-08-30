@@ -98,7 +98,7 @@ public struct CodexTranscriptReader: Sendable {
                 id: ToolActivityID.derived(fromSeed: "\(sessionID.rawValue)/\(callIdentifier)"),
                 sessionID: sessionID,
                 toolName: toolName,
-                invocation: redactor.redact(Self.rendered(invocation)),
+                invocation: redactor.redact(ToolOutput.summarised(invocation)),
                 outcome: outcomes[callIdentifier].map(redactor.redact),
                 failed: false,
                 timestamp: recordedAt
@@ -117,21 +117,10 @@ public struct CodexTranscriptReader: Sendable {
                 let callIdentifier = record.payload["call_id"] as? String
             else { continue }
 
-            outcomes[callIdentifier] = rendered(record.payload["output"])
+            outcomes[callIdentifier] = ToolOutput.summarised(record.payload["output"])
         }
 
         return outcomes
-    }
-
-    private static func rendered(_ value: Any?) -> String {
-        if let text = value as? String { return text }
-
-        guard let value,
-            let encoded = try? JSONSerialization.data(
-                withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
-        else { return "" }
-
-        return String(decoding: encoded, as: UTF8.self)
     }
 
     private func conversationMessage(

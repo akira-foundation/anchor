@@ -115,7 +115,7 @@ public struct ClaudeTranscriptReader: Sendable {
                                 fromSeed: "\(sessionID.rawValue)/\(callIdentifier)"),
                             sessionID: sessionID,
                             toolName: toolName,
-                            invocation: redactor.redact(Self.rendered(block["input"])),
+                            invocation: redactor.redact(ToolOutput.summarised(block["input"])),
                             outcome: outcome.map { redactor.redact($0.output) },
                             failed: outcome?.failed ?? false,
                             timestamp: recordedAt
@@ -139,24 +139,13 @@ public struct ClaudeTranscriptReader: Sendable {
                 guard let callIdentifier = block["tool_use_id"] as? String else { continue }
 
                 outcomes[callIdentifier] = ClaudeToolOutcome(
-                    output: rendered(block["content"]),
+                    output: ToolOutput.summarised(block["content"]),
                     failed: block["is_error"] as? Bool ?? false
                 )
             }
         }
 
         return outcomes
-    }
-
-    private static func rendered(_ value: Any?) -> String {
-        if let text = value as? String { return text }
-
-        guard let value,
-            let encoded = try? JSONSerialization.data(
-                withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
-        else { return "" }
-
-        return String(decoding: encoded, as: UTF8.self)
     }
 
     private static func prose(in message: Any?) -> String {

@@ -2,6 +2,16 @@ import AnchorDomain
 import AnchorProvider
 import Foundation
 
+struct ClaudeEntry {
+    let sessionID: SessionID
+    let entry: ConversationEntry
+}
+
+struct ClaudeToolOutcome {
+    let output: String
+    let failed: Bool
+}
+
 public struct ClaudeTranscriptReader: Sendable {
     private let redactor: SessionSecretRedactor
 
@@ -12,16 +22,18 @@ public struct ClaudeTranscriptReader: Sendable {
     public func transcripts(
         inLineDelimitedJSON text: String, forProject projectID: ProjectID
     ) -> [AgentTranscript] {
-        let messagesBySession = Dictionary(
-            grouping: text.split(separator: "\n").compactMap(conversationMessage(fromLine:)),
-            by: \.message.sessionID
-        )
+        let lines = text.split(separator: "\n")
+        let outcomes = Self.toolOutcomes(in: lines)
+        let entries =
+            lines.compactMap(conversationMessage(fromLine:))
+            + lines.flatMap { toolActivities(fromLine: $0, pairedWith: outcomes) }
+        let entriesBySession = Dictionary(grouping: entries, by: \.sessionID)
 
-        return messagesBySession.keys.sorted { $0.rawValue < $1.rawValue }
+        return entriesBySession.keys.sorted { $0.rawValue < $1.rawValue }
             .compactMap { sessionID in
                 transcript(
                     forSession: sessionID,
-                    from: messagesBySession[sessionID] ?? [],
+                    from: entriesBySession[sessionID] ?? [],
                     forProject: projectID
                 )
             }
@@ -29,10 +41,10 @@ public struct ClaudeTranscriptReader: Sendable {
 
     private func transcript(
         forSession sessionID: SessionID,
-        from entries: [(message: ConversationMessage, recordedAt: Date)],
+        from entries: [ClaudeEntry],
         forProject projectID: ProjectID
     ) -> AgentTranscript? {
-        let instants = entries.map(\.recordedAt)
+        let instants = entries.map(\.entry.timestamp)
 
         guard let startedAt = instants.min(), let updatedAt = instants.max() else { return nil }
 
@@ -44,13 +56,11 @@ public struct ClaudeTranscriptReader: Sendable {
                 startedAt: startedAt,
                 updatedAt: updatedAt
             ),
-            messages: entries.map(\.message)
+            entries: entries.map(\.entry)
         )
     }
 
-    private func conversationMessage(
-        fromLine line: Substring
-    ) -> (message: ConversationMessage, recordedAt: Date)? {
+    private func conversationMessage(fromLine line: Substring) -> ClaudeEntry? {
         guard let record = try? JSONSerialization.jsonObject(with: Data(line.utf8)),
             let fields = record as? [String: Any],
             let role = ConversationRole(rawValue: fields["type"] as? String ?? ""),
@@ -63,16 +73,90 @@ public struct ClaudeTranscriptReader: Sendable {
 
         guard !prose.isEmpty else { return nil }
 
-        return (
-            ConversationMessage(
-                id: messageID,
-                sessionID: sessionID,
-                role: role,
-                content: prose,
-                timestamp: recordedAt
-            ),
-            recordedAt
+        return ClaudeEntry(
+            sessionID: sessionID,
+            entry: .message(
+                ConversationMessage(
+                    id: messageID,
+                    sessionID: sessionID,
+                    role: role,
+                    content: prose,
+                    timestamp: recordedAt
+                )
+            )
         )
+    }
+
+    private func toolActivities(
+        fromLine line: Substring, pairedWith outcomes: [String: ClaudeToolOutcome]
+    ) -> [ClaudeEntry] {
+        guard let record = try? JSONSerialization.jsonObject(with: Data(line.utf8)),
+            let fields = record as? [String: Any],
+            fields["type"] as? String == "assistant",
+            let sessionID = (fields["sessionId"] as? String).flatMap(SessionID.init(rawValue:)),
+            let recordedAt = (fields["timestamp"] as? String).flatMap(Self.instant(from:)),
+            let message = fields["message"] as? [String: Any],
+            let blocks = message["content"] as? [[String: Any]]
+        else { return [] }
+
+        return blocks.filter { $0["type"] as? String == "tool_use" }
+            .compactMap { block in
+                guard let callIdentifier = block["id"] as? String,
+                    let toolName = block["name"] as? String
+                else { return nil }
+
+                let outcome = outcomes[callIdentifier]
+
+                return ClaudeEntry(
+                    sessionID: sessionID,
+                    entry: .toolActivity(
+                        ToolActivity(
+                            id: ToolActivityID.derived(
+                                fromSeed: "\(sessionID.rawValue)/\(callIdentifier)"),
+                            sessionID: sessionID,
+                            toolName: toolName,
+                            invocation: redactor.redact(Self.rendered(block["input"])),
+                            outcome: outcome.map { redactor.redact($0.output) },
+                            failed: outcome?.failed ?? false,
+                            timestamp: recordedAt
+                        )
+                    )
+                )
+            }
+    }
+
+    private static func toolOutcomes(in lines: [Substring]) -> [String: ClaudeToolOutcome] {
+        var outcomes: [String: ClaudeToolOutcome] = [:]
+
+        for line in lines {
+            guard let record = try? JSONSerialization.jsonObject(with: Data(line.utf8)),
+                let fields = record as? [String: Any],
+                let message = fields["message"] as? [String: Any],
+                let blocks = message["content"] as? [[String: Any]]
+            else { continue }
+
+            for block in blocks where block["type"] as? String == "tool_result" {
+                guard let callIdentifier = block["tool_use_id"] as? String else { continue }
+
+                outcomes[callIdentifier] = ClaudeToolOutcome(
+                    output: rendered(block["content"]),
+                    failed: block["is_error"] as? Bool ?? false
+                )
+            }
+        }
+
+        return outcomes
+    }
+
+    private static func rendered(_ value: Any?) -> String {
+        if let text = value as? String { return text }
+
+        guard let value,
+            let encoded = try? JSONSerialization.data(
+                withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+        else { return "" }
+
+        return String(decoding: encoded, as: UTF8.self)
     }
 
     private static func prose(in message: Any?) -> String {

@@ -36,8 +36,7 @@ public struct CodexSessionArtifacts: Sendable {
                 return false
             }
 
-            return origin.startedByAPerson
-                && Self.comparablePath(of: URL(filePath: origin.workingDirectory)) == wanted
+            return Self.comparablePath(of: URL(filePath: origin.workingDirectory)) == wanted
         }
     }
 

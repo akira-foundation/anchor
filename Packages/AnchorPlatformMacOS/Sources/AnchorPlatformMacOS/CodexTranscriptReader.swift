@@ -7,6 +7,7 @@ public struct CodexRolloutOrigin: Sendable, Hashable {
     public let sessionID: SessionID
     public let workingDirectory: String
     public let startedByAPerson: Bool
+    public let parentSessionID: SessionID?
 }
 
 public struct CodexTranscriptReader: Sendable {
@@ -28,7 +29,9 @@ public struct CodexTranscriptReader: Sendable {
             return CodexRolloutOrigin(
                 sessionID: sessionID,
                 workingDirectory: workingDirectory,
-                startedByAPerson: record.payload["thread_source"] as? String == "user"
+                startedByAPerson: record.payload["thread_source"] as? String == "user",
+                parentSessionID: (record.payload["parent_thread_id"] as? String)
+                    .flatMap(SessionID.init(rawValue:))
             )
         }
 
@@ -38,13 +41,21 @@ public struct CodexTranscriptReader: Sendable {
     public func transcript(
         inLineDelimitedJSON text: String, forProject projectID: ProjectID
     ) -> AgentTranscript? {
-        guard let origin = origin(inLineDelimitedJSON: text), origin.startedByAPerson else {
+        guard let origin = origin(inLineDelimitedJSON: text) else { return nil }
+
+        let lines = text.split(separator: "\n")
+        let outcomes = Self.toolOutcomes(in: lines)
+        let entries =
+            lines.compactMap { conversationMessage(fromLine: $0, inSession: origin.sessionID) }
+            + lines.compactMap {
+                toolActivity(fromLine: $0, inSession: origin.sessionID, pairedWith: outcomes)
+            }
+
+        guard origin.startedByAPerson || entries.contains(where: Self.isToolActivity) else {
             return nil
         }
 
-        let entries = text.split(separator: "\n")
-            .compactMap { conversationMessage(fromLine: $0, inSession: origin.sessionID) }
-        let instants = entries.map(\.recordedAt)
+        let instants = entries.map(\.timestamp)
 
         guard let startedAt = instants.min(), let updatedAt = instants.max() else { return nil }
 
@@ -54,15 +65,78 @@ public struct CodexTranscriptReader: Sendable {
                 projectID: projectID,
                 provider: .codex,
                 startedAt: startedAt,
-                updatedAt: updatedAt
+                updatedAt: updatedAt,
+                parentSessionID: origin.parentSessionID
             ),
-            messages: entries.map(\.message)
+            entries: entries
         )
+    }
+
+    private static func isToolActivity(_ entry: ConversationEntry) -> Bool {
+        guard case .toolActivity = entry else { return false }
+
+        return true
+    }
+
+    private func toolActivity(
+        fromLine line: Substring, inSession sessionID: SessionID,
+        pairedWith outcomes: [String: String]
+    ) -> ConversationEntry? {
+        guard let record = Self.record(from: line),
+            record.type == "response_item",
+            let kind = record.payload["type"] as? String,
+            ["function_call", "custom_tool_call"].contains(kind),
+            let callIdentifier = record.payload["call_id"] as? String,
+            let toolName = record.payload["name"] as? String,
+            let recordedAt = Self.instant(from: record.timestamp)
+        else { return nil }
+
+        let invocation = record.payload["arguments"] ?? record.payload["input"]
+
+        return .toolActivity(
+            ToolActivity(
+                id: ToolActivityID.derived(fromSeed: "\(sessionID.rawValue)/\(callIdentifier)"),
+                sessionID: sessionID,
+                toolName: toolName,
+                invocation: redactor.redact(Self.rendered(invocation)),
+                outcome: outcomes[callIdentifier].map(redactor.redact),
+                failed: false,
+                timestamp: recordedAt
+            )
+        )
+    }
+
+    private static func toolOutcomes(in lines: [Substring]) -> [String: String] {
+        var outcomes: [String: String] = [:]
+
+        for line in lines {
+            guard let record = record(from: line),
+                record.type == "response_item",
+                let kind = record.payload["type"] as? String,
+                ["function_call_output", "custom_tool_call_output"].contains(kind),
+                let callIdentifier = record.payload["call_id"] as? String
+            else { continue }
+
+            outcomes[callIdentifier] = rendered(record.payload["output"])
+        }
+
+        return outcomes
+    }
+
+    private static func rendered(_ value: Any?) -> String {
+        if let text = value as? String { return text }
+
+        guard let value,
+            let encoded = try? JSONSerialization.data(
+                withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+        else { return "" }
+
+        return String(decoding: encoded, as: UTF8.self)
     }
 
     private func conversationMessage(
         fromLine line: Substring, inSession sessionID: SessionID
-    ) -> (message: ConversationMessage, recordedAt: Date)? {
+    ) -> ConversationEntry? {
         guard let record = Self.record(from: line),
             record.type == "response_item",
             record.payload["type"] as? String == "message",
@@ -75,15 +149,14 @@ public struct CodexTranscriptReader: Sendable {
 
         guard !prose.isEmpty else { return nil }
 
-        return (
+        return .message(
             ConversationMessage(
                 id: MessageID.derived(fromSeed: "\(sessionID.rawValue)/\(externalIdentifier)"),
                 sessionID: sessionID,
                 role: role,
                 content: prose,
                 timestamp: recordedAt
-            ),
-            recordedAt
+            )
         )
     }
 

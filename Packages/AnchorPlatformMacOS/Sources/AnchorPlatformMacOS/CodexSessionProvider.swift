@@ -15,11 +15,8 @@ public struct CodexSessionProvider: ArtifactDiscovering {
     public func discoverArtifacts(
         forProject projectID: ProjectID
     ) async throws -> [DiscoveredArtifact] {
-        artifacts.sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
-            .map {
-                DiscoveredArtifact(
-                    artifact: $0.artifact, contentHash: ContentHash.digest(of: $0.content))
-            }
+        try await artifacts.discoveredArtifacts(
+            forProject: projectID, inWorkspaceAt: workspaceURL)
     }
 }
 

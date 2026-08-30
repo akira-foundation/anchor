@@ -6,6 +6,8 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
     public let kind: KnowledgeEntryKind
     public let summaryText: String
     public let source: KnowledgeEntrySource
+    public let sourceContentHash: ContentHash
+    public let state: KnowledgeEntryState
     public let createdAt: Date
 
     public init(
@@ -14,6 +16,8 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
         kind: KnowledgeEntryKind,
         summaryText: String,
         source: KnowledgeEntrySource,
+        sourceContentHash: ContentHash,
+        state: KnowledgeEntryState = .current,
         createdAt: Date
     ) {
         self.id = id
@@ -21,6 +25,8 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
         self.kind = kind
         self.summaryText = summaryText
         self.source = source
+        self.sourceContentHash = sourceContentHash
+        self.state = state
         self.createdAt = createdAt
     }
 }

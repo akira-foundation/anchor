@@ -108,6 +108,7 @@ private struct ReadOnlySessionProvider: ArtifactDiscovering, ArtifactClassifying
                 kind: .summary,
                 summaryText: "one summary per discovered artifact",
                 source: .artifact(discoveredArtifact.artifact.id),
+                sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
                 createdAt: Date(timeIntervalSince1970: 0)
             )
         ]

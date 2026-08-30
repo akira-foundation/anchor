@@ -16,6 +16,7 @@ extension SuperpowersArtifactProvider: ArtifactClassifying {
                 kind: knowledgeKind(for: discoveredArtifact.artifact),
                 summaryText: firstLine,
                 source: .artifact(discoveredArtifact.artifact.id),
+                sourceContentHash: discoveredArtifact.contentHash,
                 createdAt: Date()
             )
         ]

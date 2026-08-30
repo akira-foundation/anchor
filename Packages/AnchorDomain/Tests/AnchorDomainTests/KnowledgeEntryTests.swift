@@ -14,6 +14,7 @@ struct KnowledgeEntryTests {
             kind: .decision,
             summaryText: "SQLite chosen for the local index",
             source: .artifact(sourceArtifactID),
+            sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
             createdAt: Date(timeIntervalSince1970: 0)
         )
 
@@ -30,9 +31,25 @@ struct KnowledgeEntryTests {
             kind: .question,
             summaryText: "Which algorithm backs ContentHash?",
             source: .session(sourceSessionID, messageIDs: sourceMessageIDs),
+            sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
             createdAt: Date(timeIntervalSince1970: 0)
         )
 
         #expect(knowledgeEntry.source == .session(sourceSessionID, messageIDs: sourceMessageIDs))
+    }
+
+    @Test("an entry is current until its source moves on")
+    func anEntryIsCurrentUntilItsSourceMovesOn() {
+        let entry = KnowledgeEntry(
+            id: KnowledgeEntryID(),
+            projectID: ProjectID(),
+            kind: .decision,
+            summaryText: "SQLite chosen for the local index",
+            source: .artifact(ArtifactID()),
+            sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+
+        #expect(entry.state == .current)
     }
 }

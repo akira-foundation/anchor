@@ -36,6 +36,7 @@ public struct GraphifyArtifactProvider: ArtifactDiscovering, ArtifactClassifying
                 kind: .summary,
                 summaryText: firstLine,
                 source: .artifact(discoveredArtifact.artifact.id),
+                sourceContentHash: discoveredArtifact.contentHash,
                 createdAt: Date()
             )
         ]

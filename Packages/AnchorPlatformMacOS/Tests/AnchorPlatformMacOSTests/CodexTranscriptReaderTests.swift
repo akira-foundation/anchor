@@ -154,3 +154,136 @@ struct CodexTranscriptReaderTests {
         #expect(transcript.messages.first?.content.contains("hunter2secret") == false)
     }
 }
+
+@Suite("Tool activity and sub-agents in a Codex rollout")
+struct CodexToolActivityTests {
+    private let reader = CodexTranscriptReader()
+    private let projectID = ProjectID()
+    private let session = "019ff304-ca04-79a0-816a-267f4b5a1f85"
+    private let parent = "019f81ab-0169-7500-b5ae-c20afa647a92"
+
+    private func line(_ fields: [String: Any]) -> String {
+        String(
+            decoding: try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys]),
+            as: UTF8.self
+        )
+    }
+
+    private func metaLine(threadSource: String, withParent: Bool = false) -> String {
+        var payload: [String: Any] = [
+            "session_id": session, "cwd": "/Users/kid/bu-country/bu-payment",
+            "thread_source": threadSource,
+        ]
+        if withParent { payload["parent_thread_id"] = parent }
+
+        return line([
+            "type": "session_meta", "timestamp": "2026-08-12T00:50:05.000Z", "payload": payload,
+        ])
+    }
+
+    private func callLine(callIdentifier: String, name: String, arguments: String) -> String {
+        line([
+            "type": "response_item", "timestamp": "2026-08-12T00:50:06.000Z",
+            "payload": [
+                "type": "function_call", "call_id": callIdentifier, "name": name,
+                "arguments": arguments,
+            ],
+        ])
+    }
+
+    private func outputLine(callIdentifier: String, output: String) -> String {
+        line([
+            "type": "response_item", "timestamp": "2026-08-12T00:50:07.000Z",
+            "payload": [
+                "type": "function_call_output", "call_id": callIdentifier, "output": output,
+            ],
+        ])
+    }
+
+    @Test("a call and its output become one entry")
+    func aCallAndItsOutputBecomeOneEntry() throws {
+        let text = [
+            metaLine(threadSource: "user"),
+            callLine(callIdentifier: "call_1", name: "exec_command", arguments: "{\"cmd\":\"ls\"}"),
+            outputLine(callIdentifier: "call_1", output: "Package.swift"),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcript(inLineDelimitedJSON: text, forProject: projectID))
+        let activity = try #require(transcript.toolActivities.first)
+
+        #expect(transcript.toolActivities.count == 1)
+        #expect(activity.toolName == "exec_command")
+        #expect(activity.outcome == "Package.swift")
+    }
+
+    @Test("a sub-agent that did work is kept and points at the session that spawned it")
+    func aSubAgentThatDidWorkIsKeptAndPointsAtTheSessionThatSpawnedIt() throws {
+        let text = [
+            metaLine(threadSource: "subagent", withParent: true),
+            callLine(
+                callIdentifier: "call_1", name: "exec_command",
+                arguments: "{\"cmd\":\"swift build\"}"),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcript(inLineDelimitedJSON: text, forProject: projectID))
+
+        #expect(transcript.session.parentSessionID == SessionID(rawValue: parent))
+        #expect(transcript.toolActivities.count == 1)
+    }
+
+    @Test("a sub-agent that only assessed something is left out")
+    func aSubAgentThatOnlyAssessedSomethingIsLeftOut() {
+        let text = [
+            metaLine(threadSource: "subagent", withParent: true),
+            line([
+                "type": "response_item", "timestamp": "2026-08-12T00:50:06.000Z",
+                "payload": [
+                    "type": "message", "role": "assistant", "id": "msg_1",
+                    "content": [["type": "output_text", "text": "{\"outcome\":\"allow\"}"]],
+                ],
+            ]),
+        ].joined(separator: "\n")
+
+        #expect(reader.transcript(inLineDelimitedJSON: text, forProject: projectID) == nil)
+    }
+
+    @Test("reasoning is not part of the record")
+    func reasoningIsNotPartOfTheRecord() throws {
+        let text = [
+            metaLine(threadSource: "user"),
+            line([
+                "type": "response_item", "timestamp": "2026-08-12T00:50:06.000Z",
+                "payload": ["type": "reasoning", "id": "rs_1", "encrypted_content": "gAAAAA"],
+            ]),
+            line([
+                "type": "response_item", "timestamp": "2026-08-12T00:50:07.000Z",
+                "payload": [
+                    "type": "message", "role": "assistant", "id": "msg_1",
+                    "content": [["type": "output_text", "text": "done"]],
+                ],
+            ]),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcript(inLineDelimitedJSON: text, forProject: projectID))
+
+        #expect(transcript.entries.count == 1)
+    }
+
+    @Test("a secret in the arguments never reaches the record")
+    func aSecretInTheArgumentsNeverReachesTheRecord() throws {
+        let text = [
+            metaLine(threadSource: "user"),
+            callLine(
+                callIdentifier: "call_1", name: "exec_command",
+                arguments: "{\"cmd\":\"psql postgresql://appuser:hunter2secret@db/payments\"}"),
+        ].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcript(inLineDelimitedJSON: text, forProject: projectID))
+
+        #expect(transcript.toolActivities.first?.invocation.contains("hunter2secret") == false)
+    }
+}

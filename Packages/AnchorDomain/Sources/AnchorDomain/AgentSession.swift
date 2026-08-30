@@ -6,15 +6,17 @@ public struct AgentSession: Sendable, Hashable, Codable, Identifiable {
     public let provider: AgentProvider
     public let startedAt: Date
     public let updatedAt: Date
+    public let parentSessionID: SessionID?
 
     public init(
         id: SessionID, projectID: ProjectID, provider: AgentProvider, startedAt: Date,
-        updatedAt: Date
+        updatedAt: Date, parentSessionID: SessionID? = nil
     ) {
         self.id = id
         self.projectID = projectID
         self.provider = provider
         self.startedAt = startedAt
         self.updatedAt = updatedAt
+        self.parentSessionID = parentSessionID
     }
 }

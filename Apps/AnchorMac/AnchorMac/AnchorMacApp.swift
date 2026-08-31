@@ -8,6 +8,12 @@ struct AnchorMacApp: App {
         menuBarSymbolName: "point.3.filled.connected.trianglepath.dotted"
     )
 
+    init() {
+        let engine = compositionRoot.contextEngine
+
+        Task { await engine.start() }
+    }
+
     var body: some Scene {
         MenuBarExtra(
             compositionRoot.applicationDisplayName,

@@ -76,7 +76,11 @@ struct ContextEngineAssemblyTests {
 
         let observed = ObservedWorkspace(workspaceURL: workspace, projectName: "anchor")
         let storage = await assembleStorage(reachingAccount: false)
-        let checkpointDirectory = support.appending(path: "checkpoints")
+        let checkpointFile =
+            support
+            .appending(path: "checkpoints")
+            .appending(path: "\(observed.projectID.rawValue).json")
+        var reached: [UInt64] = []
 
         for run in 1...2 {
             let coordinator = ContextEngineAssembly.makeCoordinator(
@@ -88,31 +92,38 @@ struct ContextEngineAssemblyTests {
 
             try await coordinator.startObserving(
                 workspaceAt: workspace, forProject: observed.projectID)
+            try await Task.sleep(for: .milliseconds(400))
             try Data("plan revised on run \(run)".utf8)
                 .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
-            _ = await waitForCheckpoint(in: checkpointDirectory)
+            reached.append(await waitForCheckpoint(at: checkpointFile, beyond: reached.last))
             await coordinator.stopObserving()
         }
 
         let written = try FileManager.default.contentsOfDirectory(
-            atPath: checkpointDirectory.path(percentEncoded: false))
+            atPath: support.appending(path: "checkpoints").path(percentEncoded: false))
 
         #expect(written == ["\(observed.projectID.rawValue).json"])
+        #expect(reached.count == 2)
+        #expect(reached[0] > 0)
+        #expect(reached[1] > reached[0])
     }
 
-    private func waitForCheckpoint(in directoryURL: URL) async -> [String] {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    private func waitForCheckpoint(at fileURL: URL, beyond previous: UInt64?) async -> UInt64 {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
 
         while ContinuousClock.now < deadline {
-            let written =
-                (try? FileManager.default.contentsOfDirectory(
-                    atPath: directoryURL.path(percentEncoded: false))) ?? []
+            let stored =
+                (try? JSONDecoder().decode(
+                    [String: UInt64].self, from: Data(contentsOf: fileURL)))?.values.first
 
-            guard written.isEmpty else { return written }
+            guard let stored, stored > (previous ?? 0) else {
+                try? await Task.sleep(for: .milliseconds(50))
+                continue
+            }
 
-            try? await Task.sleep(for: .milliseconds(50))
+            return stored
         }
 
-        return []
+        return 0
     }
 }

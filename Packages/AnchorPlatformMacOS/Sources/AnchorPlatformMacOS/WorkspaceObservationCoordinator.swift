@@ -16,6 +16,7 @@ public actor WorkspaceObservationCoordinator {
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var refusals: [String] = []
+    private var refusalCount = 0
 
     public init(
         device: Device,
@@ -41,14 +42,12 @@ public actor WorkspaceObservationCoordinator {
 
     public var recordedRefusals: [String] { refusals }
 
+    public var recordedRefusalCount: Int { refusalCount }
+
     public func startObserving(
         workspaceAt workspaceURL: URL, forProject projectID: ProjectID
     ) async throws {
         guard device.canDiscoverLocalProviders, !isObserving else { return }
-
-        try await operationJournal.recoverInterruptedOperations()
-        try? await announcePresence(onProject: projectID)
-        try? await synchronizer.synchronizePendingArtifactRevisions()
 
         let checkpoint = try checkpointStore.checkpoint(forWorkspaceAt: workspaceURL)
         let changes = observer.observeWorkspaceChanges(at: workspaceURL, resumingFrom: checkpoint)
@@ -57,6 +56,14 @@ public actor WorkspaceObservationCoordinator {
             for await change in changes {
                 await self?.handle(change, forProject: projectID)
             }
+        }
+
+        await recording("recovering interrupted operations") {
+            try await operationJournal.recoverInterruptedOperations()
+        }
+        await recording("announcing presence") { try await announcePresence(onProject: projectID) }
+        await recording("synchronizing revisions") {
+            try await synchronizer.synchronizePendingArtifactRevisions()
         }
     }
 
@@ -73,32 +80,38 @@ public actor WorkspaceObservationCoordinator {
     }
 
     private func handle(_ change: WorkspaceChange, forProject projectID: ProjectID) async {
-        await recording("recording the change") {
+        let recorded = await recording("recording the change") {
             _ = try await recordChange.perform(
                 RecordWorkspaceChangeRequest(device: device, projectID: projectID, change: change)
             )
+        }
+
+        if recorded, let reached = await observer.latestCheckpoint() {
+            await recording("recording the checkpoint") {
+                try checkpointStore.recordCheckpoint(reached, forWorkspaceAt: change.workspaceURL)
+            }
         }
 
         await recording("announcing presence") { try await announcePresence(onProject: projectID) }
         await recording("synchronizing revisions") {
             try await synchronizer.synchronizePendingArtifactRevisions()
         }
-
-        guard let reached = await observer.latestCheckpoint() else { return }
-
-        await recording("recording the checkpoint") {
-            try checkpointStore.recordCheckpoint(reached, forWorkspaceAt: change.workspaceURL)
-        }
     }
 
+    @discardableResult
     private func recording(
         _ attempt: String, _ work: () async throws -> Void
-    ) async {
+    ) async -> Bool {
         do {
             try await work()
+
+            return true
         } catch {
+            refusalCount += 1
             refusals.append("\(attempt): \(error)")
             refusals = refusals.suffix(Self.rememberedRefusalCount)
+
+            return false
         }
     }
 }

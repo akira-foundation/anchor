@@ -32,6 +32,6 @@ public struct ObservationCheckpointStore: Sendable {
     }
 
     private func workspaceKey(for workspaceURL: URL) -> String {
-        workspaceURL.resolvingSymlinksInPath().path()
+        WorkspacePath.comparable(workspaceURL)
     }
 }

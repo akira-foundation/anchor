@@ -19,6 +19,7 @@ public struct ObservedWorkspaceConfiguration: Sendable {
         case unreadable(URL)
         case projectUnnamed(URL)
         case workspaceUnnamed(URL)
+        case workspaceAbsent(String)
     }
 
     private struct StoredConfiguration: Decodable {
@@ -49,7 +50,17 @@ public struct ObservedWorkspaceConfiguration: Sendable {
         let workspacePath = stored.workspacePath?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let workspacePath, !workspacePath.isEmpty else { throw .workspaceUnnamed(fileURL) }
 
-        return ObservedWorkspace(
+        let observed = ObservedWorkspace(
             workspaceURL: URL(filePath: workspacePath), projectName: projectName)
+
+        var pointsAtDirectory = ObjCBool(false)
+        guard
+            FileManager.default.fileExists(
+                atPath: observed.workspaceURL.path(percentEncoded: false),
+                isDirectory: &pointsAtDirectory),
+            pointsAtDirectory.boolValue
+        else { throw .workspaceAbsent(workspacePath) }
+
+        return observed
     }
 }

@@ -2,6 +2,10 @@ import CoreServices
 import Foundation
 
 enum FileSystemEventStream {
+    static func watchedPath(for workspaceURL: URL) -> String {
+        workspaceURL.path(percentEncoded: false)
+    }
+
     private static let creationFlags = UInt32(
         kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes
     )
@@ -29,7 +33,7 @@ enum FileSystemEventStream {
                 delivery.deliver(changedPaths)
             },
             &context,
-            [workspaceURL.path()] as CFArray,
+            [Self.watchedPath(for: workspaceURL)] as CFArray,
             checkpoint ?? FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             coalescingLatency,
             creationFlags

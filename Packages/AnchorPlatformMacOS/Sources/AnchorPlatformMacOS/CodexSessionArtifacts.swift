@@ -131,7 +131,7 @@ public struct CodexSessionArtifacts: Sendable {
         return walker.allObjects
             .compactMap { $0 as? URL }
             .filter { $0.pathExtension == "jsonl" }
-            .sorted { $0.path() < $1.path() }
+            .sorted { $0.path(percentEncoded: false) < $1.path(percentEncoded: false) }
     }
 
     private func openingLines(of fileURL: URL) -> String {

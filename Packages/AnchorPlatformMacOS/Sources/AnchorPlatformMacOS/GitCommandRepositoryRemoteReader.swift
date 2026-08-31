@@ -48,7 +48,7 @@ public struct GitCommandRepositoryRemoteReader: RepositoryRemoteReading {
     private func runGit(_ arguments: [String], inDirectory directoryURL: URL) throws -> String? {
         let process = Process()
         process.executableURL = commandLauncherURL
-        process.arguments = ["git", "-C", directoryURL.path()] + arguments
+        process.arguments = ["git", "-C", directoryURL.path(percentEncoded: false)] + arguments
 
         let output = Pipe()
         process.standardOutput = output

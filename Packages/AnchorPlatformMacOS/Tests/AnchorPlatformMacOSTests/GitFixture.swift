@@ -12,23 +12,31 @@ enum GitFixture {
 
     static func makeRepository(named name: String) throws -> URL {
         let directory = try makePlainDirectory(named: name)
-        try runGit(["-c", "init.defaultBranch=main", "init", "-q", directory.path()])
-        try runGit(["-C", directory.path(), "config", "user.email", "fixture@example.com"])
-        try runGit(["-C", directory.path(), "config", "user.name", "fixture"])
+        try runGit([
+            "-c", "init.defaultBranch=main", "init", "-q", directory.path(percentEncoded: false),
+        ])
+        try runGit([
+            "-C", directory.path(percentEncoded: false), "config", "user.email",
+            "fixture@example.com",
+        ])
+        try runGit(["-C", directory.path(percentEncoded: false), "config", "user.name", "fixture"])
         try Data("seed\n".utf8).write(to: directory.appending(path: "seed.txt"))
-        try runGit(["-C", directory.path(), "add", "."])
-        try runGit(["-C", directory.path(), "commit", "-qm", "chore: seed"])
+        try runGit(["-C", directory.path(percentEncoded: false), "add", "."])
+        try runGit(["-C", directory.path(percentEncoded: false), "commit", "-qm", "chore: seed"])
 
         return directory
     }
 
     static func addRemote(named name: String, url: String, to repository: URL) throws {
-        try runGit(["-C", repository.path(), "remote", "add", name, url])
+        try runGit(["-C", repository.path(percentEncoded: false), "remote", "add", name, url])
     }
 
     static func addWorktree(named name: String, to repository: URL) throws -> URL {
         let worktree = repository.deletingLastPathComponent().appending(path: name)
-        try runGit(["-C", repository.path(), "worktree", "add", "-q", worktree.path(), "-b", name])
+        try runGit([
+            "-C", repository.path(percentEncoded: false), "worktree", "add", "-q",
+            worktree.path(percentEncoded: false), "-b", name,
+        ])
 
         return worktree
     }
@@ -44,8 +52,8 @@ enum GitFixture {
             """
         try Data(contents.utf8).write(to: includedConfiguration)
         try runGit([
-            "-C", repository.path(), "config", "--local", "include.path",
-            includedConfiguration.path(),
+            "-C", repository.path(percentEncoded: false), "config", "--local", "include.path",
+            includedConfiguration.path(percentEncoded: false),
         ])
     }
 

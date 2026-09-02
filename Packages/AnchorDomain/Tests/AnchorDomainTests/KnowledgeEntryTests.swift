@@ -30,12 +30,12 @@ struct KnowledgeEntryTests {
             projectID: ProjectID(),
             kind: .question,
             summaryText: "Which algorithm backs ContentHash?",
-            source: .session(sourceSessionID, messageIDs: sourceMessageIDs),
+            source: .session(sourceSessionID),
             sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
             createdAt: Date(timeIntervalSince1970: 0)
         )
 
-        #expect(knowledgeEntry.source == .session(sourceSessionID, messageIDs: sourceMessageIDs))
+        #expect(knowledgeEntry.source == .session(sourceSessionID))
     }
 
     @Test("an entry is current until its source moves on")

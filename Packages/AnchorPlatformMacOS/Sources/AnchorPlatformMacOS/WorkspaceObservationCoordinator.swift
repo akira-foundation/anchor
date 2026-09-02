@@ -13,6 +13,7 @@ public actor WorkspaceObservationCoordinator {
     private let recordChange: RecordWorkspaceChangeAction
     private let synchronizer: any ArtifactRevisionSynchronizing
     private let presences: any DevicePresenceRegistry
+    private let sessionContext: SessionContextRecording?
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var refusals: [String] = []
@@ -26,6 +27,7 @@ public actor WorkspaceObservationCoordinator {
         recordChange: RecordWorkspaceChangeAction,
         synchronizer: any ArtifactRevisionSynchronizing,
         presences: any DevicePresenceRegistry,
+        sessionContext: SessionContextRecording? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.device = device
@@ -35,6 +37,7 @@ public actor WorkspaceObservationCoordinator {
         self.recordChange = recordChange
         self.synchronizer = synchronizer
         self.presences = presences
+        self.sessionContext = sessionContext
         self.now = now
     }
 
@@ -80,10 +83,17 @@ public actor WorkspaceObservationCoordinator {
     }
 
     private func handle(_ change: WorkspaceChange, forProject projectID: ProjectID) async {
+        var outcome: RecordWorkspaceChangeOutcome = .deviceCannotDiscover
         let recorded = await recording("recording the change") {
-            _ = try await recordChange.perform(
+            outcome = try await recordChange.perform(
                 RecordWorkspaceChangeRequest(device: device, projectID: projectID, change: change)
             )
+        }
+
+        if recorded, case .recorded(let revisions) = outcome {
+            await recording("indexing the sessions") {
+                try await sessionContext?.recordSessionContext(in: revisions, at: now())
+            }
         }
 
         if recorded, let reached = await observer.latestCheckpoint() {

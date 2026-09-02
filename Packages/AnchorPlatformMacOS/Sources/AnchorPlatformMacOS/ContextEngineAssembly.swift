@@ -1,6 +1,8 @@
 import AnchorApplication
 import AnchorDomain
+import AnchorKnowledge
 import AnchorPersistence
+import AnchorSearch
 import AnchorStorage
 import AnchorSync
 import Foundation
@@ -11,7 +13,8 @@ public enum ContextEngineAssembly {
         observedWorkspace: ObservedWorkspace,
         storage: AssembledContextStorage,
         supportDirectoryURL: URL,
-        sessionFileIndex: SessionFileIndex? = nil
+        sessionFileIndex: SessionFileIndex? = nil,
+        sessionContext: SessionContextRecording? = nil
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
         let projectID = observedWorkspace.projectID
@@ -35,22 +38,45 @@ public enum ContextEngineAssembly {
                 operationJournal: operationJournal
             ),
             synchronizer: makeSynchronizer(storage: storage, operations: operationJournal),
-            presences: makePresences(storage: storage)
+            presences: makePresences(storage: storage),
+            sessionContext: sessionContext
         )
     }
 
-    public static func makeSessionFileIndex(
+    public static func makeLocalDatabase(
         inSupportDirectoryAt supportDirectoryURL: URL
-    ) async -> SessionFileIndex? {
+    ) -> SQLiteDatabase? {
         try? FileManager.default.createDirectory(
             at: supportDirectoryURL, withIntermediateDirectories: true)
 
+        return try? SQLiteDatabase(
+            fileURL: supportDirectoryURL.appending(path: "sessions.sqlite"))
+    }
+
+    public static func makeSessionFileIndex(
+        over database: SQLiteDatabase
+    ) async
+        -> SessionFileIndex?
+    {
+        try? await SessionFileIndex(database: database)
+    }
+
+    public static func makeSessionContext(
+        over database: SQLiteDatabase, storage: AssembledContextStorage
+    ) async -> SessionContextRecording? {
         guard
-            let database = try? SQLiteDatabase(
-                fileURL: supportDirectoryURL.appending(path: "sessions.sqlite"))
+            let search = try? await SQLiteContextSearch(database: database),
+            let knowledge = try? await SQLiteKnowledgeStore(database: database)
         else { return nil }
 
-        return try? await SessionFileIndex(database: database)
+        return StoredSessionContextRecorder(
+            contentStore: StoredArtifactContentStore(storage: storage.local),
+            action: RecordSessionContextAction(
+                index: SearchedTranscriptIndex(search: search),
+                knowledge: ExtractedSessionKnowledge(
+                    extractor: MarkedKnowledgeExtractor(), store: knowledge)
+            )
+        )
     }
 
     private static func makeDiscoverer(

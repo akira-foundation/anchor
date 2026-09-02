@@ -10,10 +10,14 @@ public enum AgentSessionArtifactNaming {
     public static func name(forSession sessionID: SessionID, provider: AgentProvider) -> String {
         "\(canonicalPrefix(for: provider))/\(sessionID.rawValue).json"
     }
+
+    public static func names(_ name: String, aSessionOf provider: AgentProvider) -> Bool {
+        name.hasPrefix(canonicalPrefix(for: provider) + "/")
+    }
 }
 
 extension Artifact {
     public var isAgentSessionTranscript: Bool {
-        name.hasPrefix(AgentSessionArtifactNaming.canonicalPrefix(for: provider) + "/")
+        AgentSessionArtifactNaming.names(name, aSessionOf: provider)
     }
 }

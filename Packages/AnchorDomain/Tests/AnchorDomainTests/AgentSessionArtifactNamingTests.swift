@@ -57,3 +57,26 @@ struct AgentSessionArtifactNamingTests {
         #expect(!artifact.isAgentSessionTranscript)
     }
 }
+
+@Suite("A session belongs to the provider whose folder it sits in")
+struct SessionProviderRecognitionTests {
+    @Test("an artifact under one provider's folder is not the other provider's session")
+    func artifactUnderOneProvidersFolderIsNotOtherProvidersSession() throws {
+        let sessionID = SessionID()
+        let underClaude = AgentSessionArtifactNaming.name(
+            forSession: sessionID, provider: .claude)
+        let artifact = try #require(
+            Artifact(
+                id: ArtifactID(), projectID: ProjectID(), provider: .codex, name: underClaude))
+
+        #expect(!artifact.isAgentSessionTranscript)
+        #expect(AgentSessionArtifactNaming.names(underClaude, aSessionOf: .claude))
+        #expect(!AgentSessionArtifactNaming.names(underClaude, aSessionOf: .codex))
+    }
+
+    @Test("a folder whose name merely starts the same way is a different folder")
+    func folderWhoseNameMerelyStartsSameWayIsDifferentFolder() {
+        #expect(!AgentSessionArtifactNaming.names("sessions/codexes/x.json", aSessionOf: .codex))
+        #expect(!AgentSessionArtifactNaming.names("sessions/claudette/x.json", aSessionOf: .claude))
+    }
+}

@@ -33,7 +33,7 @@ public struct CodexSessionContentReader: ArtifactContentReading {
         ofArtifactNamed name: String,
         inWorkspaceAt workspaceURL: URL
     ) async throws -> Data? {
-        guard name.hasPrefix(SessionArtifact.canonicalPrefix(for: .codex)) else { return nil }
+        guard AgentSessionArtifactNaming.names(name, aSessionOf: .codex) else { return nil }
 
         return artifacts.sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
             .first { $0.artifact.name == name }?

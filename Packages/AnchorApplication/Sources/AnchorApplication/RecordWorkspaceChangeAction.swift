@@ -29,13 +29,6 @@ public struct RecordedArtifactRevision: Sendable, Equatable {
 public enum RecordWorkspaceChangeOutcome: Sendable, Equatable {
     case recorded([RecordedArtifactRevision])
     case deviceCannotDiscover
-
-    public var revisionCount: Int {
-        switch self {
-        case .recorded(let revisions): revisions.count
-        case .deviceCannotDiscover: 0
-        }
-    }
 }
 
 public struct RecordWorkspaceChangeAction: Action {

@@ -43,40 +43,59 @@ public enum ContextEngineAssembly {
         )
     }
 
-    public static func makeLocalDatabase(
+    public static func makeSessionFileIndex(
         inSupportDirectoryAt supportDirectoryURL: URL
-    ) -> SQLiteDatabase? {
+    ) async -> SessionFileIndex? {
         try? FileManager.default.createDirectory(
             at: supportDirectoryURL, withIntermediateDirectories: true)
 
-        return try? SQLiteDatabase(
-            fileURL: supportDirectoryURL.appending(path: "sessions.sqlite"))
-    }
+        guard
+            let database = try? SQLiteDatabase(
+                fileURL: supportDirectoryURL.appending(path: "sessions.sqlite"))
+        else { return nil }
 
-    public static func makeSessionFileIndex(
-        over database: SQLiteDatabase
-    ) async
-        -> SessionFileIndex?
-    {
-        try? await SessionFileIndex(database: database)
+        return try? await SessionFileIndex(database: database)
     }
 
     public static func makeSessionContext(
-        over database: SQLiteDatabase, storage: AssembledContextStorage
-    ) async -> SessionContextRecording? {
-        guard
-            let search = try? await SQLiteContextSearch(database: database),
-            let knowledge = try? await SQLiteKnowledgeStore(database: database)
-        else { return nil }
-
-        return StoredSessionContextRecorder(
-            contentStore: StoredArtifactContentStore(storage: storage.local),
-            action: RecordSessionContextAction(
-                index: SearchedTranscriptIndex(search: search),
-                knowledge: ExtractedSessionKnowledge(
-                    extractor: MarkedKnowledgeExtractor(), store: knowledge)
+        storage: AssembledContextStorage
+    ) async throws -> AssembledSessionContext {
+        let database = try SQLiteDatabase(fileURL: nil)
+        let search = try await SQLiteContextSearch(database: database)
+        let action = RecordSessionContextAction(
+            index: SearchedTranscriptIndex(search: search),
+            knowledge: ExtractedSessionKnowledge(
+                extractor: MarkedKnowledgeExtractor(),
+                store: try await SQLiteKnowledgeStore(database: database)
             )
         )
+
+        return AssembledSessionContext(
+            search: search,
+            recorder: StoredSessionContextRecorder(
+                contentStore: StoredArtifactContentStore(storage: storage.local), action: action),
+            rebuilder: DiscoveredSessionContextRebuilder(action: action)
+        )
+    }
+
+    public static func sessionsOnDisk(
+        forProject projectID: ProjectID,
+        inWorkspaceAt workspaceURL: URL,
+        sessionFileIndex: SessionFileIndex? = nil
+    ) -> [(artifact: Artifact, content: Data)] {
+        claudeSessions().sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
+            + codexSessions(indexedBy: sessionFileIndex)
+            .sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
+    }
+
+    private static func claudeSessions() -> ClaudeSessionArtifacts {
+        ClaudeSessionArtifacts()
+    }
+
+    private static func codexSessions(
+        indexedBy sessionFileIndex: SessionFileIndex?
+    ) -> CodexSessionArtifacts {
+        CodexSessionArtifacts(index: sessionFileIndex)
     }
 
     private static func makeDiscoverer(
@@ -85,10 +104,10 @@ public enum ContextEngineAssembly {
         CompositeArtifactDiscoverer([
             SuperpowersArtifactProvider(workspaceURL: workspaceURL),
             GraphifyArtifactProvider(workspaceURL: workspaceURL),
-            ClaudeSessionProvider(workspaceURL: workspaceURL),
+            ClaudeSessionProvider(workspaceURL: workspaceURL, artifacts: claudeSessions()),
             CodexSessionProvider(
                 workspaceURL: workspaceURL,
-                artifacts: CodexSessionArtifacts(index: sessionFileIndex)
+                artifacts: codexSessions(indexedBy: sessionFileIndex)
             ),
         ])
     }

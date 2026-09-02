@@ -2,10 +2,20 @@ import AnchorApplication
 import AnchorDomain
 import Foundation
 
+public struct SessionContextRefusal: Sendable, Hashable {
+    public let artifactName: String
+    public let description: String
+
+    public init(artifactName: String, description: String) {
+        self.artifactName = artifactName
+        self.description = description
+    }
+}
+
 public protocol SessionContextRecording: Sendable {
     func recordSessionContext(
         in revisions: [RecordedArtifactRevision], at instant: Date
-    ) async throws
+    ) async -> [SessionContextRefusal]
 }
 
 public struct StoredSessionContextRecorder: SessionContextRecording {
@@ -19,18 +29,28 @@ public struct StoredSessionContextRecorder: SessionContextRecording {
 
     public func recordSessionContext(
         in revisions: [RecordedArtifactRevision], at instant: Date
-    ) async throws {
-        for revision in revisions where revision.artifact.isAgentSessionTranscript {
-            guard let content = try await contentStore.content(forRevision: revision.revisionID)
-            else { continue }
+    ) async -> [SessionContextRefusal] {
+        var refusals: [SessionContextRefusal] = []
 
-            _ = try await action.perform(
-                RecordSessionContextRequest(
-                    artifact: revision.artifact,
-                    content: content,
-                    contentHash: revision.contentHash,
-                    recordedAt: instant
-                ))
+        for revision in revisions where revision.artifact.isAgentSessionTranscript {
+            do {
+                guard let content = try await contentStore.content(forRevision: revision.revisionID)
+                else { continue }
+
+                _ = try await action.perform(
+                    RecordSessionContextRequest(
+                        artifact: revision.artifact,
+                        content: content,
+                        contentHash: revision.contentHash,
+                        recordedAt: instant
+                    ))
+            } catch {
+                refusals.append(
+                    SessionContextRefusal(
+                        artifactName: revision.artifact.name, description: "\(error)"))
+            }
         }
+
+        return refusals
     }
 }

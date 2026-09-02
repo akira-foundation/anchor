@@ -91,8 +91,10 @@ public actor WorkspaceObservationCoordinator {
         }
 
         if recorded, case .recorded(let revisions) = outcome {
-            await recording("indexing the sessions") {
-                try await sessionContext?.recordSessionContext(in: revisions, at: now())
+            for refusal in await sessionContext?.recordSessionContext(in: revisions, at: now())
+                ?? []
+            {
+                remember("indexing \(refusal.artifactName)", refusal.description)
             }
         }
 
@@ -108,6 +110,12 @@ public actor WorkspaceObservationCoordinator {
         }
     }
 
+    private func remember(_ attempt: String, _ description: String) {
+        refusalCount += 1
+        refusals.append("\(attempt): \(description)")
+        refusals = refusals.suffix(Self.rememberedRefusalCount)
+    }
+
     @discardableResult
     private func recording(
         _ attempt: String, _ work: () async throws -> Void
@@ -117,9 +125,7 @@ public actor WorkspaceObservationCoordinator {
 
             return true
         } catch {
-            refusalCount += 1
-            refusals.append("\(attempt): \(error)")
-            refusals = refusals.suffix(Self.rememberedRefusalCount)
+            remember(attempt, "\(error)")
 
             return false
         }

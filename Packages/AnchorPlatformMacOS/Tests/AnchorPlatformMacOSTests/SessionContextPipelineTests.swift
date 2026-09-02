@@ -233,7 +233,7 @@ struct StoredSessionContextRecorderTests {
             )
         )
 
-        try await recorder.recordSessionContext(
+        let refusals = await recorder.recordSessionContext(
             in: [
                 RecordedArtifactRevision(
                     artifact: try makeArtifact(
@@ -256,7 +256,65 @@ struct StoredSessionContextRecorderTests {
 
         let hits = try await search.findContext(matching: "checkpoint", limit: 10)
 
+        #expect(refusals.isEmpty)
         #expect(hits.map(\.sessionID) == [sessionID])
+    }
+
+    @Test("a session nobody can read does not stop the sessions after it")
+    func sessionNobodyCanReadDoesNotStopSessionsAfterIt() async throws {
+        let storage = InMemoryStorageProvider()
+        let contentStore = StoredArtifactContentStore(storage: storage)
+        let database = try SQLiteDatabase(fileURL: nil)
+        let search = try await SQLiteContextSearch(database: database)
+        let goodSessionID = SessionID()
+
+        let brokenRevisionID = RevisionID()
+        let goodRevisionID = RevisionID()
+        let broken = Data("this was never a transcript".utf8)
+        let good = try encode(makeTranscript(goodSessionID, "the checkpoint stays honest"))
+        try await contentStore.storeContent(broken, forRevision: brokenRevisionID)
+        try await contentStore.storeContent(good, forRevision: goodRevisionID)
+
+        let recorder = StoredSessionContextRecorder(
+            contentStore: contentStore,
+            action: RecordSessionContextAction(
+                index: SearchedTranscriptIndex(search: search),
+                knowledge: ExtractedSessionKnowledge(
+                    extractor: MarkedKnowledgeExtractor(),
+                    store: try await SQLiteKnowledgeStore(database: database)
+                )
+            )
+        )
+
+        let refusals = await recorder.recordSessionContext(
+            in: [
+                RecordedArtifactRevision(
+                    artifact: try makeArtifact(
+                        named: AgentSessionArtifactNaming.name(
+                            forSession: SessionID(), provider: .claude),
+                        provider: .claude
+                    ),
+                    revisionID: brokenRevisionID,
+                    contentHash: ContentHash.digest(of: broken)
+                ),
+                RecordedArtifactRevision(
+                    artifact: try makeArtifact(
+                        named: AgentSessionArtifactNaming.name(
+                            forSession: goodSessionID, provider: .claude),
+                        provider: .claude
+                    ),
+                    revisionID: goodRevisionID,
+                    contentHash: ContentHash.digest(of: good)
+                ),
+            ],
+            at: recordedAt
+        )
+
+        let hits = try await search.findContext(matching: "checkpoint", limit: 10)
+
+        #expect(refusals.count == 1)
+        #expect(refusals.first?.description.contains("contentIsNotATranscript") == true)
+        #expect(hits.map(\.sessionID) == [goodSessionID])
     }
 
     @Test("a session whose content is gone is skipped rather than failing the batch")
@@ -274,7 +332,7 @@ struct StoredSessionContextRecorderTests {
             )
         )
 
-        try await recorder.recordSessionContext(
+        let refusals = await recorder.recordSessionContext(
             in: [
                 RecordedArtifactRevision(
                     artifact: try makeArtifact(
@@ -288,5 +346,121 @@ struct StoredSessionContextRecorderTests {
             ],
             at: recordedAt
         )
+
+        #expect(refusals.isEmpty)
+    }
+}
+
+@Suite("Rebuilding the index from what is on disk")
+struct DiscoveredSessionContextRebuilderTests {
+    private let projectID = ProjectID()
+    private let recordedAt = Date(timeIntervalSince1970: 1_000)
+
+    private func makeSession(
+        _ content: String
+    ) throws
+        -> (sessionID: SessionID, artifact: Artifact, content: Data)
+    {
+        let sessionID = SessionID()
+        let transcript = AgentTranscript(
+            session: AgentSession(
+                id: sessionID, projectID: projectID, provider: .claude,
+                startedAt: recordedAt, updatedAt: recordedAt),
+            entries: [
+                .message(
+                    ConversationMessage(
+                        id: MessageID(), sessionID: sessionID, role: .user,
+                        content: content, timestamp: recordedAt))
+            ]
+        )
+        let made = try #require(SessionArtifact.make(from: transcript, forProject: projectID))
+
+        return (sessionID, made.artifact, made.content)
+    }
+
+    @Test("the sessions found on disk become searchable without any change happening")
+    func sessionsFoundOnDiskBecomeSearchableWithoutAnyChangeHappening() async throws {
+        let database = try SQLiteDatabase(fileURL: nil)
+        let search = try await SQLiteContextSearch(database: database)
+        let rebuilder = DiscoveredSessionContextRebuilder(
+            action: RecordSessionContextAction(
+                index: SearchedTranscriptIndex(search: search),
+                knowledge: ExtractedSessionKnowledge(
+                    extractor: MarkedKnowledgeExtractor(),
+                    store: try await SQLiteKnowledgeStore(database: database)
+                )
+            ))
+        let first = try makeSession("the checkpoint stays honest")
+        let second = try makeSession("the journal stays local")
+
+        let rebuilt = await rebuilder.rebuild(
+            from: [
+                (artifact: first.artifact, content: first.content),
+                (artifact: second.artifact, content: second.content),
+            ],
+            at: recordedAt
+        )
+
+        #expect(rebuilt.indexedSessions == 2)
+        #expect(rebuilt.refusals.isEmpty)
+        #expect(
+            try await search.findContext(matching: "checkpoint", limit: 10).map(\.sessionID)
+                == [first.sessionID])
+        #expect(
+            try await search.findContext(matching: "journal", limit: 10).map(\.sessionID)
+                == [second.sessionID])
+    }
+
+    @Test("a session that cannot be read is counted out rather than stopping the rebuild")
+    func sessionThatCannotBeReadIsCountedOutRatherThanStoppingRebuild() async throws {
+        let database = try SQLiteDatabase(fileURL: nil)
+        let search = try await SQLiteContextSearch(database: database)
+        let rebuilder = DiscoveredSessionContextRebuilder(
+            action: RecordSessionContextAction(
+                index: SearchedTranscriptIndex(search: search),
+                knowledge: ExtractedSessionKnowledge(
+                    extractor: MarkedKnowledgeExtractor(),
+                    store: try await SQLiteKnowledgeStore(database: database)
+                )
+            ))
+        let good = try makeSession("the checkpoint stays honest")
+        let broken = try makeSession("unused")
+
+        let rebuilt = await rebuilder.rebuild(
+            from: [
+                (artifact: broken.artifact, content: Data("not a transcript".utf8)),
+                (artifact: good.artifact, content: good.content),
+            ],
+            at: recordedAt
+        )
+
+        #expect(rebuilt.indexedSessions == 1)
+        #expect(rebuilt.refusals.map(\.artifactName) == [broken.artifact.name])
+        #expect(
+            try await search.findContext(matching: "checkpoint", limit: 10).map(\.sessionID)
+                == [good.sessionID])
+    }
+
+    @Test("what is not a session is not rebuilt")
+    func whatIsNotSessionIsNotRebuilt() async throws {
+        let database = try SQLiteDatabase(fileURL: nil)
+        let rebuilder = DiscoveredSessionContextRebuilder(
+            action: RecordSessionContextAction(
+                index: SearchedTranscriptIndex(
+                    search: try await SQLiteContextSearch(database: database)),
+                knowledge: ExtractedSessionKnowledge(
+                    extractor: MarkedKnowledgeExtractor(),
+                    store: try await SQLiteKnowledgeStore(database: database)
+                )
+            ))
+        let plan = try #require(
+            Artifact(
+                id: ArtifactID(), projectID: projectID, provider: .superpowers,
+                name: "docs/superpowers/plans/00.md"))
+
+        let rebuilt = await rebuilder.rebuild(
+            from: [(artifact: plan, content: Data("a plan".utf8))], at: recordedAt)
+
+        #expect(rebuilt.indexedSessions == 0)
     }
 }

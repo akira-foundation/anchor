@@ -60,7 +60,7 @@ enum GitFixture {
     private static func runGit(_ arguments: [String]) throws {
         let process = Process()
         process.executableURL = URL(filePath: "/usr/bin/env")
-        process.arguments = ["git"] + arguments
+        process.arguments = ["git", "-c", "commit.gpgsign=false"] + arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()

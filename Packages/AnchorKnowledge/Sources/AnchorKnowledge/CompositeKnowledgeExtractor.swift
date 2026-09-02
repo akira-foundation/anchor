@@ -13,12 +13,24 @@ public struct CompositeKnowledgeExtractor: KnowledgeExtracting {
     ) async throws -> [KnowledgeEntry] {
         var entries: [KnowledgeEntry] = []
         var seen: Set<KnowledgeEntryID> = []
+        var refusals: [String] = []
 
         for extractor in extractors {
-            for entry in (try? await extractor.extractEntries(for: request)) ?? []
-            where seen.insert(entry.id).inserted {
-                entries.append(entry)
+            do {
+                for entry in try await extractor.extractEntries(for: request)
+                where seen.insert(entry.id).inserted {
+                    entries.append(entry)
+                }
+            } catch {
+                refusals.append(String(describing: error))
             }
+        }
+
+        guard refusals.isEmpty else {
+            throw KnowledgeExtractionRefusal(
+                extractedEntries: entries,
+                descriptions: refusals
+            )
         }
 
         return entries

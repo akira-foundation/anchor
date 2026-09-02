@@ -52,6 +52,15 @@ struct MarkedKnowledgeExtractorTests {
         #expect(entries.first?.summaryText == "split the coordinator")
     }
 
+    @Test("a conversation role before a marker does not hide it")
+    func conversationRoleBeforeMarkerDoesNotHideIt() async throws {
+        let entries = try await extractor.extractEntries(
+            for: request("user: TODO: split the coordinator"))
+
+        #expect(entries.first?.kind == .todo)
+        #expect(entries.first?.summaryText == "split the coordinator")
+    }
+
     @Test("a line with no marker produces nothing")
     func aLineWithNoMarkerProducesNothing() async throws {
         let entries = try await extractor.extractEntries(
@@ -71,6 +80,7 @@ struct MarkedKnowledgeExtractorTests {
 
         #expect(entries.first?.source == .artifact(artifactID))
         #expect(entries.first?.projectID == projectID)
+        #expect(entries.first?.origin == .marked)
     }
 
     @Test("the same line in the same source keeps the same identity")
@@ -101,7 +111,11 @@ struct SQLiteKnowledgeStoreTests {
         try await SQLiteKnowledgeStore(database: try SQLiteDatabase(fileURL: nil))
     }
 
-    private func entry(_ text: String, digestOf source: String) -> KnowledgeEntry {
+    private func entry(
+        _ text: String,
+        digestOf source: String,
+        origin: KnowledgeEntryOrigin = .classified
+    ) -> KnowledgeEntry {
         KnowledgeEntry(
             id: KnowledgeEntryID(),
             projectID: projectID,
@@ -109,6 +123,7 @@ struct SQLiteKnowledgeStoreTests {
             summaryText: text,
             source: .artifact(artifactID),
             sourceContentHash: ContentHash.digest(of: Data(source.utf8)),
+            origin: origin,
             createdAt: Date(timeIntervalSince1970: 0)
         )
     }
@@ -125,6 +140,64 @@ struct SQLiteKnowledgeStoreTests {
         let found = try await store.entries(forProject: projectID, includingSuperseded: false)
 
         #expect(found.map(\.summaryText) == ["SQLite backs the index"])
+    }
+
+    @Test("an inferred entry comes back as inferred")
+    func inferredEntryComesBackAsInferred() async throws {
+        let store = try await makeStore()
+
+        try await store.recordEntries(
+            [entry("keep the journal local", digestOf: "one", origin: .inferred)],
+            supersedingEntriesFrom: .artifact(artifactID)
+        )
+
+        let found = try await store.entries(forProject: projectID, includingSuperseded: false)
+
+        #expect(found.map(\.origin) == [.inferred])
+    }
+
+    @Test("a database from before origins existed is migrated without losing knowledge")
+    func databaseFromBeforeOriginsExistedIsMigratedWithoutLosingKnowledge() async throws {
+        let database = try SQLiteDatabase(fileURL: nil)
+        try await database.execute(
+            """
+            CREATE TABLE knowledge_entries (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                summary_text TEXT NOT NULL,
+                source TEXT NOT NULL,
+                source_content_hash TEXT NOT NULL,
+                state TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            """)
+        let source = String(
+            decoding: try JSONEncoder().encode(KnowledgeEntrySource.artifact(artifactID)),
+            as: UTF8.self)
+        try await database.run(
+            """
+            INSERT INTO knowledge_entries (
+                id, project_id, kind, summary_text, source, source_content_hash,
+                state, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            [
+                .text(KnowledgeEntryID().rawValue),
+                .text(projectID.rawValue),
+                .text(KnowledgeEntryKind.decision.rawValue),
+                .text("keep the journal local"),
+                .text(source),
+                .text(ContentHash.digest(of: Data("one".utf8)).rawValue),
+                .text(KnowledgeEntryState.current.rawValue),
+                .integer(0),
+            ])
+
+        let store = try await SQLiteKnowledgeStore(database: database)
+        let found = try await store.entries(forProject: projectID, includingSuperseded: false)
+
+        #expect(found.map(\.origin) == [.classified])
+        #expect(found.map(\.summaryText) == ["keep the journal local"])
     }
 
     @Test("a source that moved on supersedes what it had said")

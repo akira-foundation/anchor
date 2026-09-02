@@ -14,6 +14,7 @@
 		075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A5D0000000000000000000A5 /* AnchorSearch */; };
 		075F80103045954F00FF7001 /* AnchorKnowledge in Frameworks */ = {isa = PBXBuildFile; productRef = A6D0000000000000000000A6 /* AnchorKnowledge */; };
 		075F80113045954F00FF7002 /* AnchorPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A7D0000000000000000000A7 /* AnchorPersistence */; };
+		075F80123045954F00FF7003 /* AnchorIntelligence in Frameworks */ = {isa = PBXBuildFile; productRef = A8D0000000000000000000A8 /* AnchorIntelligence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 				075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */,
 				075F80103045954F00FF7001 /* AnchorKnowledge in Frameworks */,
 				075F80113045954F00FF7002 /* AnchorPersistence in Frameworks */,
+				075F80123045954F00FF7003 /* AnchorIntelligence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +91,7 @@
 				A5D0000000000000000000A5 /* AnchorSearch */,
 				A6D0000000000000000000A6 /* AnchorKnowledge */,
 				A7D0000000000000000000A7 /* AnchorPersistence */,
+				A8D0000000000000000000A8 /* AnchorIntelligence */,
 			);
 			productName = AnchorMac;
 			productReference = 4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */;
@@ -126,6 +129,7 @@
 				B5D0000000000000000000B5 /* XCLocalSwiftPackageReference "../../Packages/AnchorSearch" */,
 				B6D0000000000000000000B6 /* XCLocalSwiftPackageReference "../../Packages/AnchorKnowledge" */,
 				B7D0000000000000000000B7 /* XCLocalSwiftPackageReference "../../Packages/AnchorPersistence" */,
+				B8D0000000000000000000B8 /* XCLocalSwiftPackageReference "../../Packages/AnchorIntelligence" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0C1453DE0237AB3065FD4CB1 /* Products */;
@@ -300,6 +304,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/AnchorPersistence;
 		};
+		B8D0000000000000000000B8 /* XCLocalSwiftPackageReference "../../Packages/AnchorIntelligence" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorIntelligence;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -330,6 +338,10 @@
 		A7D0000000000000000000A7 /* AnchorPersistence */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AnchorPersistence;
+		};
+		A8D0000000000000000000A8 /* AnchorIntelligence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorIntelligence;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -5,6 +5,16 @@ public enum InferenceReadiness: Sendable, Hashable {
     case unavailable(String)
 }
 
+public struct StatementInferenceUnavailable: Error, Sendable, Hashable,
+    CustomStringConvertible
+{
+    public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
+}
+
 public struct InferenceRequest: Sendable, Hashable {
     public let window: InferenceWindow
     public let kinds: [String]

@@ -16,6 +16,13 @@ struct OnDeviceStatementInferenceTests {
 
         #expect(statements.isEmpty)
     }
+
+    @Test("an unavailable model is a refusal rather than an empty answer")
+    func unavailableModelIsRefusalRatherThanEmptyAnswer() {
+        #expect(throws: StatementInferenceUnavailable.self) {
+            try requireAvailableInference(.unavailable("model is preparing"))
+        }
+    }
 }
 
 @Suite(
@@ -40,7 +47,9 @@ struct OnDeviceStatementInferenceLiveTests {
 
         let statements = try await OnDeviceStatementInference().inferStatements(
             for: InferenceRequest(
-                window: InferenceWindow(over: conversation, keeping: 20_000), kinds: kinds))
+                window: InferenceWindow(
+                    over: conversation, keeping: InferenceWindow.defaultCharacterBudget),
+                kinds: kinds))
 
         #expect(statements.contains { $0.kind == "decision" })
         #expect(statements.allSatisfy { kinds.contains($0.kind) })
@@ -56,8 +65,31 @@ struct OnDeviceStatementInferenceLiveTests {
 
         let statements = try await OnDeviceStatementInference().inferStatements(
             for: InferenceRequest(
-                window: InferenceWindow(over: conversation, keeping: 20_000), kinds: kinds))
+                window: InferenceWindow(
+                    over: conversation, keeping: InferenceWindow.defaultCharacterBudget),
+                kinds: kinds))
 
-        #expect(statements.allSatisfy { kinds.contains($0.kind) })
+        #expect(statements.isEmpty)
+    }
+
+    @Test("the default window fits in the window the model actually has")
+    func defaultWindowFitsInWindowModelActuallyHas() async throws {
+        let sentences = [
+            "user: where should the operation journal live?",
+            "assistant: we decided to keep it on local disk only.",
+            "user: what did the tests say?",
+            "assistant: four hundred and eighty six passed, none failed.",
+            "user: and the checkpoint?",
+            "assistant: it now waits for the recording to succeed first.",
+        ]
+        let conversation = (0..<400).map { sentences[$0 % sentences.count] }
+            .joined(separator: "\n")
+        let window = InferenceWindow(
+            over: conversation, keeping: InferenceWindow.defaultCharacterBudget)
+
+        #expect(window.text.count == InferenceWindow.defaultCharacterBudget)
+
+        _ = try await OnDeviceStatementInference().inferStatements(
+            for: InferenceRequest(window: window, kinds: kinds))
     }
 }

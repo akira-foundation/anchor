@@ -1,3 +1,4 @@
+import AnchorPlatformMacOS
 import AnchorSharedUI
 import SwiftUI
 
@@ -28,6 +29,17 @@ struct AnchorMacRootView: View {
         return "\n\(indexedSessions) sessions searchable"
     }
 
+    private func inferenceSuffix(_ status: KnowledgeInferenceStatus) -> String {
+        switch status {
+        case .disabled:
+            return "\nKnowledge inference is off"
+        case .ready:
+            return "\nInferring knowledge from sessions"
+        case .unavailable(let description):
+            return "\nKnowledge inference unavailable: \(description)"
+        }
+    }
+
     private func refusalSuffix(_ refusals: [String]) -> String {
         guard let latest = refusals.last else { return "" }
 
@@ -38,12 +50,14 @@ struct AnchorMacRootView: View {
         switch contextEngine.state {
         case .idle:
             return "Not watching yet"
-        case .watching(let projectName, .synchronized, let indexed, let refusals):
+        case .watching(let projectName, .synchronized, let indexed, let inference, let refusals):
             return "Watching \(projectName), synchronized with iCloud"
-                + indexSuffix(indexed) + refusalSuffix(refusals)
-        case .watching(let projectName, .localOnlyUntilAccountReturns, let indexed, let refusals):
+                + indexSuffix(indexed) + inferenceSuffix(inference) + refusalSuffix(refusals)
+        case .watching(
+            let projectName, .localOnlyUntilAccountReturns, let indexed, let inference,
+            let refusals):
             return "Watching \(projectName), on this Mac only. iCloud was unreachable at launch"
-                + indexSuffix(indexed) + refusalSuffix(refusals)
+                + indexSuffix(indexed) + inferenceSuffix(inference) + refusalSuffix(refusals)
         case .noWorkspaceConfigured:
             return "No workspace configured"
         case .failed(let description):

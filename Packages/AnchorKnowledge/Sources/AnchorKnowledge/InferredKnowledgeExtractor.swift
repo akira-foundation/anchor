@@ -18,14 +18,19 @@ public struct InferredKnowledgeExtractor: KnowledgeExtracting {
     public func extractEntries(
         for request: KnowledgeExtractionRequest
     ) async throws -> [KnowledgeEntry] {
-        guard case .ready = await inference.readiness() else { return [] }
+        switch await inference.readiness() {
+        case .ready:
+            break
+        case .unavailable(let description):
+            throw KnowledgeInferenceUnavailable(description: description)
+        }
 
         let window = InferenceWindow(over: request.text, keeping: characterBudget)
-        let statements =
-            (try? await inference.inferStatements(
-                for: InferenceRequest(window: window, kinds: Self.askedKinds))) ?? []
+        let statements = try await inference.inferStatements(
+            for: InferenceRequest(window: window, kinds: Self.askedKinds))
 
-        return statements.compactMap { entry(from: $0, for: request) }
+        return InferredStatement.usable(among: statements, amongKinds: Self.askedKinds)
+            .compactMap { entry(from: $0, for: request) }
     }
 
     private static let askedKinds = KnowledgeEntryKind.allCases.map(\.rawValue)
@@ -37,12 +42,15 @@ public struct InferredKnowledgeExtractor: KnowledgeExtracting {
 
         return KnowledgeEntry(
             id: KnowledgeEntryID.derived(
-                fromSeed: "inferred/\(request.sourceContentHash.rawValue)/\(statement.summaryText)"),
+                fromSeed:
+                    "inferred/\(request.sourceContentHash.rawValue)/\(kind.rawValue)/\(statement.summaryText)"
+            ),
             projectID: request.projectID,
             kind: kind,
             summaryText: statement.summaryText,
             source: request.source,
             sourceContentHash: request.sourceContentHash,
+            origin: .inferred,
             createdAt: request.extractedAt
         )
     }

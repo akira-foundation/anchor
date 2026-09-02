@@ -35,7 +35,8 @@ struct CoordinatorRefusalTests {
     private func makeCoordinator(
         discoverer: any ArtifactDiscovering,
         synchronizer: any ArtifactRevisionSynchronizing,
-        checkpointURL: URL
+        checkpointURL: URL,
+        initialRefusals: [String] = []
     ) -> WorkspaceObservationCoordinator {
         let storage = InMemoryStorageProvider()
         let contentStore = StoredArtifactContentStore(storage: storage)
@@ -58,7 +59,8 @@ struct CoordinatorRefusalTests {
                 operationJournal: operationJournal
             ),
             synchronizer: synchronizer,
-            presences: DeferredDevicePresenceRegistry()
+            presences: DeferredDevicePresenceRegistry(),
+            initialRefusals: initialRefusals
         )
     }
 
@@ -101,6 +103,25 @@ struct CoordinatorRefusalTests {
 
         #expect(refusals.count == 1)
         #expect(refusals.first?.hasPrefix("synchronizing revisions:") == true)
+    }
+
+    @Test("refusals found before observation are reported once")
+    func refusalsFoundBeforeObservationAreReportedOnce() async {
+        let coordinator = makeCoordinator(
+            discoverer: CompositeArtifactDiscoverer([]),
+            synchronizer: DeferredArtifactSynchronizer(),
+            checkpointURL: checkpointURL(),
+            initialRefusals: ["indexing session: model unavailable"]
+        )
+
+        #expect(await coordinator.recordedRefusals == ["indexing session: model unavailable"])
+        #expect(await coordinator.recordedRefusals == ["indexing session: model unavailable"])
+        #expect(await coordinator.recordedRefusalCount == 1)
+
+        await coordinator.recordRefusals(["indexing session: model became unavailable again"])
+
+        #expect(await coordinator.recordedRefusalCount == 2)
+        #expect(await coordinator.recordedRefusals.count == 2)
     }
 
     @Test("a change that could not be recorded is remembered with the attempt that failed")

@@ -31,6 +31,18 @@ private struct StubInference: StatementInferring {
 
 private struct Refusal: Error {}
 
+private actor RecordingInference: StatementInferring {
+    private(set) var asked: InferenceRequest?
+
+    func readiness() async -> InferenceReadiness { .ready }
+
+    func inferStatements(for request: InferenceRequest) async throws -> [InferredStatement] {
+        asked = request
+
+        return []
+    }
+}
+
 @Suite("Knowledge a model read out of a conversation")
 struct InferredKnowledgeExtractorTests {
     private let projectID = ProjectID()
@@ -59,25 +71,74 @@ struct InferredKnowledgeExtractorTests {
         #expect(entries.map(\.kind) == [.decision, .risk])
         #expect(entries.allSatisfy { $0.source == .session(sessionID) })
         #expect(entries.allSatisfy { $0.projectID == projectID })
+        #expect(entries.allSatisfy { $0.origin == .inferred })
     }
 
-    @Test("a machine with no model reports nothing rather than failing")
-    func machineWithNoModelReportsNothingRatherThanFailing() async throws {
+    @Test("a machine with no model reports why inference is unavailable")
+    func machineWithNoModelReportsWhyInferenceIsUnavailable() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(
                 ready: .unavailable("Apple Intelligence is off"),
                 statements: [InferredStatement(kind: "decision", summaryText: "never asked")]
             ))
 
-        #expect(try await extractor.extractEntries(for: request("a conversation")).isEmpty)
+        do {
+            _ = try await extractor.extractEntries(for: request("a conversation"))
+            Issue.record("expected unavailable inference to be reported")
+        } catch {
+            #expect(String(describing: error) == "Apple Intelligence is off")
+        }
     }
 
-    @Test("a model that refuses does not take the session down with it")
-    func modelThatRefusesDoesNotTakeSessionDownWithIt() async throws {
+    @Test("a model that refuses says so instead of reporting nothing")
+    func modelThatRefusesSaysSoInsteadOfReportingNothing() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(refusal: Refusal()))
 
-        #expect(try await extractor.extractEntries(for: request("a conversation")).isEmpty)
+        await #expect(throws: Refusal.self) {
+            try await extractor.extractEntries(for: request("a conversation"))
+        }
+    }
+
+    @Test("a statement with nothing to say is not stored as knowledge")
+    func statementWithNothingToSayIsNotStoredAsKnowledge() async throws {
+        let extractor = InferredKnowledgeExtractor(
+            inference: StubInference(statements: [
+                InferredStatement(kind: "todo", summaryText: "   "),
+                InferredStatement(kind: "risk", summaryText: "the journal grows unbounded"),
+            ]))
+
+        let entries = try await extractor.extractEntries(for: request("a conversation"))
+
+        #expect(entries.map(\.kind) == [.risk])
+    }
+
+    @Test("the same sentence of two different kinds is two things the project knows")
+    func sameSentenceOfTwoDifferentKindsIsTwoThingsProjectKnows() async throws {
+        let extractor = InferredKnowledgeExtractor(
+            inference: StubInference(statements: [
+                InferredStatement(kind: "risk", summaryText: "the journal grows unbounded"),
+                InferredStatement(kind: "todo", summaryText: "the journal grows unbounded"),
+            ]))
+
+        let entries = try await extractor.extractEntries(for: request("a conversation"))
+
+        #expect(entries.map(\.kind) == [.risk, .todo])
+        #expect(Set(entries.map(\.id)).count == 2)
+    }
+
+    @Test("the conversation is cut to the budget before it is asked about")
+    func conversationIsCutToBudgetBeforeItIsAskedAbout() async throws {
+        let inference = RecordingInference()
+        let conversation = String(repeating: "a", count: 5_000)
+
+        _ = try await InferredKnowledgeExtractor(inference: inference, characterBudget: 1_200)
+            .extractEntries(for: request(conversation))
+
+        let asked = try #require(await inference.asked)
+
+        #expect(asked.window.text.count == 1_200)
+        #expect(asked.window.omittedCharacterCount == 3_800)
     }
 
     @Test("a kind the domain does not have is not stored as one it does")
@@ -151,14 +212,18 @@ struct CompositeKnowledgeExtractorTests {
         #expect(Set(entries.map(\.kind)) == [.todo, .risk])
     }
 
-    @Test("an extractor that fails does not silence the one beside it")
-    func extractorThatFailsDoesNotSilenceOneBesideIt() async throws {
-        let entries = try await CompositeKnowledgeExtractor([
-            InferredKnowledgeExtractor(inference: StubInference(refusal: Refusal())),
-            MarkedKnowledgeExtractor(),
-        ]).extractEntries(for: request("TODO: wire the search"))
-
-        #expect(entries.map(\.kind) == [.todo])
+    @Test("an extractor that fails is not hidden behind the ones that worked")
+    func extractorThatFailsIsNotHiddenBehindOnesThatWorked() async throws {
+        do {
+            _ = try await CompositeKnowledgeExtractor([
+                InferredKnowledgeExtractor(inference: StubInference(refusal: Refusal())),
+                MarkedKnowledgeExtractor(),
+            ]).extractEntries(for: request("TODO: wire the search"))
+            Issue.record("expected the partial extraction to report its refusal")
+        } catch let refusal as KnowledgeExtractionRefusal {
+            #expect(refusal.extractedEntries.map(\.kind) == [.todo])
+            #expect(refusal.descriptions.first?.contains("Refusal") == true)
+        }
     }
 
     @Test("the same thing found twice is stored once")

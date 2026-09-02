@@ -30,7 +30,9 @@ public struct OnDeviceStatementInference: StatementInferring {
     }
 
     public func inferStatements(for request: InferenceRequest) async throws -> [InferredStatement] {
-        guard case .ready = await readiness(), !request.window.text.isEmpty else { return [] }
+        guard !request.window.text.isEmpty else { return [] }
+
+        try requireAvailableInference(await readiness())
 
         let session = LanguageModelSession(instructions: Self.instructions(for: request.kinds))
         let drafts = try await session.respond(
@@ -52,5 +54,14 @@ public struct OnDeviceStatementInference: StatementInferring {
         Report nothing when the transcript states nothing of those kinds.
         Never infer intent that is not written down.
         """
+    }
+}
+
+func requireAvailableInference(_ readiness: InferenceReadiness) throws {
+    switch readiness {
+    case .ready:
+        return
+    case .unavailable(let description):
+        throw StatementInferenceUnavailable(description: description)
     }
 }

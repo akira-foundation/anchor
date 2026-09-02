@@ -17,6 +17,20 @@ private actor RecordingIndex: AgentTranscriptIndexing {
     }
 }
 
+private struct KnowledgeRefusal: Error {}
+
+private struct RefusingKnowledge: AgentSessionKnowledgeRecording {
+    func recordKnowledge(
+        fromText text: String,
+        forProject projectID: ProjectID,
+        source: KnowledgeEntrySource,
+        sourceContentHash: ContentHash,
+        at instant: Date
+    ) async throws {
+        throw KnowledgeRefusal()
+    }
+}
+
 private actor RecordingKnowledge: AgentSessionKnowledgeRecording {
     struct Recorded: Sendable, Equatable {
         let text: String
@@ -150,8 +164,8 @@ struct RecordSessionContextActionTests {
         }
     }
 
-    @Test("what the knowledge reads is the prose, not the machinery")
-    func whatKnowledgeReadsIsProseNotMachinery() async throws {
+    @Test("what the knowledge reads preserves who said each message")
+    func whatKnowledgeReadsPreservesWhoSaidEachMessage() async throws {
         let transcript = makeTranscript(
             messages: [(.user, "DECISION: keep the journal local"), (.assistant, "understood")])
         let knowledge = RecordingKnowledge()
@@ -161,8 +175,7 @@ struct RecordSessionContextActionTests {
 
         let recorded = try #require(await knowledge.recorded.first)
 
-        #expect(recorded.text.contains("DECISION: keep the journal local"))
-        #expect(recorded.text.contains("understood"))
+        #expect(recorded.text == "user: DECISION: keep the journal local\nassistant: understood")
     }
 
     @Test("the knowledge points at the session it came from")
@@ -178,6 +191,31 @@ struct RecordSessionContextActionTests {
 
         #expect(recorded.source == .session(sessionID))
         #expect(recorded.contentHash == request.contentHash)
+    }
+
+    @Test("knowledge that could not be read does not unmake the session that was indexed")
+    func knowledgeThatCouldNotBeReadDoesNotUnmakeSessionThatWasIndexed() async throws {
+        let transcript = makeTranscript(messages: [(.user, "a decision was made")])
+        let index = RecordingIndex()
+
+        let report = try await RecordSessionContextAction(
+            index: index, knowledge: RefusingKnowledge()
+        ).recordSessionContext(try makeRequest(transcript: transcript))
+
+        #expect(await index.indexed.map(\.session.id) == [sessionID])
+        #expect(report.outcome == .indexed(messageCount: 1))
+        #expect(report.knowledgeRefusal?.contains("KnowledgeRefusal") == true)
+    }
+
+    @Test("the action contract still propagates a knowledge refusal")
+    func actionContractStillPropagatesKnowledgeRefusal() async throws {
+        let transcript = makeTranscript(messages: [(.user, "a decision was made")])
+
+        await #expect(throws: KnowledgeRefusal.self) {
+            try await RecordSessionContextAction(
+                index: RecordingIndex(), knowledge: RefusingKnowledge()
+            ).perform(try makeRequest(transcript: transcript))
+        }
     }
 
     @Test("a session that could not be indexed does not quietly record its knowledge")

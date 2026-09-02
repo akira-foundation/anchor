@@ -38,6 +38,7 @@ public struct MarkedKnowledgeExtractor: KnowledgeExtracting {
             summaryText: marked.summaryText,
             source: request.source,
             sourceContentHash: request.sourceContentHash,
+            origin: .marked,
             createdAt: request.extractedAt
         )
     }
@@ -48,8 +49,11 @@ public struct MarkedKnowledgeExtractor: KnowledgeExtracting {
     private static func marked(
         in line: String
     ) -> (kind: KnowledgeEntryKind, summaryText: String)? {
+        let unprefixed = removingConversationRole(from: line)
         let opening = String(
-            line.drop { listPunctuation.contains($0) || emphasis.contains($0) || $0.isNumber })
+            unprefixed.drop {
+                listPunctuation.contains($0) || emphasis.contains($0) || $0.isNumber
+            })
         let uppercased = opening.uppercased()
 
         for (marker, kind) in markers {
@@ -65,5 +69,16 @@ public struct MarkedKnowledgeExtractor: KnowledgeExtracting {
         }
 
         return nil
+    }
+
+    private static func removingConversationRole(from line: String) -> String {
+        guard
+            let role = ConversationRole.allCases.first(where: {
+                line.lowercased().hasPrefix("\($0.rawValue):")
+            })
+        else { return line }
+
+        return String(line.dropFirst(role.rawValue.count + 1))
+            .trimmingCharacters(in: .whitespaces)
     }
 }

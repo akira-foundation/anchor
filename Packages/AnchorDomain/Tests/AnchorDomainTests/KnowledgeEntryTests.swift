@@ -24,7 +24,6 @@ struct KnowledgeEntryTests {
     @Test("an entry extracted from a session reports that session and its messages")
     func entryExtractedFromASessionReportsThatSessionAndItsMessages() {
         let sourceSessionID = SessionID()
-        let sourceMessageIDs = [MessageID()]
         let knowledgeEntry = KnowledgeEntry(
             id: KnowledgeEntryID(),
             projectID: ProjectID(),
@@ -51,5 +50,43 @@ struct KnowledgeEntryTests {
         )
 
         #expect(entry.state == .current)
+    }
+
+    @Test("an entry records whether a model inferred it")
+    func entryRecordsWhetherModelInferredIt() {
+        let entry = KnowledgeEntry(
+            id: KnowledgeEntryID(),
+            projectID: ProjectID(),
+            kind: .decision,
+            summaryText: "keep the journal local",
+            source: .session(SessionID()),
+            sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
+            origin: .inferred,
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+
+        #expect(entry.origin == .inferred)
+    }
+
+    @Test("an entry encoded before origins existed remains classified")
+    func entryEncodedBeforeOriginsExistedRemainsClassified() throws {
+        let entry = KnowledgeEntry(
+            id: KnowledgeEntryID(),
+            projectID: ProjectID(),
+            kind: .decision,
+            summaryText: "keep the journal local",
+            source: .session(SessionID()),
+            sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
+            origin: .inferred,
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+        var encoded = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(entry)) as? [String: Any])
+        encoded.removeValue(forKey: "origin")
+
+        let decoded = try JSONDecoder().decode(
+            KnowledgeEntry.self, from: JSONSerialization.data(withJSONObject: encoded))
+
+        #expect(decoded.origin == .classified)
     }
 }

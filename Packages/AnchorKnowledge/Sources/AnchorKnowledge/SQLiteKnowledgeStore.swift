@@ -16,6 +16,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
                 summary_text TEXT NOT NULL,
                 source TEXT NOT NULL,
                 source_content_hash TEXT NOT NULL,
+                origin TEXT NOT NULL DEFAULT 'classified',
                 state TEXT NOT NULL,
                 created_at INTEGER NOT NULL
             );
@@ -24,6 +25,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
             CREATE INDEX IF NOT EXISTS knowledge_by_source ON knowledge_entries (source);
             """
         )
+        try await addOriginColumnIfMissing()
     }
 
     public func recordEntries(
@@ -51,7 +53,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
         try await database.run(
             """
             SELECT id, project_id, kind, summary_text, source, source_content_hash,
-                   state, created_at
+                   origin, state, created_at
             FROM knowledge_entries
             WHERE project_id = ? AND state \(Self.stateFilter(includingSuperseded))
             ORDER BY created_at, id;
@@ -72,13 +74,14 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
             """
             INSERT INTO knowledge_entries (
                 id, project_id, kind, summary_text, source, source_content_hash,
-                state, created_at
+                origin, state, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 state = excluded.state,
                 summary_text = excluded.summary_text,
-                source_content_hash = excluded.source_content_hash;
+                source_content_hash = excluded.source_content_hash,
+                origin = excluded.origin;
             """,
             [
                 .text(entry.id.rawValue),
@@ -87,6 +90,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
                 .text(entry.summaryText),
                 .text(try Self.encoded(entry.source)),
                 .text(entry.sourceContentHash.rawValue),
+                .text(entry.origin.rawValue),
                 .text(entry.state.rawValue),
                 .integer(Int64(entry.createdAt.timeIntervalSince1970)),
             ]
@@ -107,6 +111,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
             let summaryText = row["summary_text"]?.text,
             let source = row["source"]?.text.flatMap(Self.decodedSource(from:)),
             let contentHash = row["source_content_hash"]?.text.flatMap(ContentHash.init(rawValue:)),
+            let origin = row["origin"]?.text.flatMap(KnowledgeEntryOrigin.init(rawValue:)),
             let state = row["state"]?.text.flatMap(KnowledgeEntryState.init(rawValue:)),
             let createdAt = row["created_at"]?.integer
         else { return nil }
@@ -118,6 +123,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
             summaryText: summaryText,
             source: source,
             sourceContentHash: contentHash,
+            origin: origin,
             state: state,
             createdAt: Date(timeIntervalSince1970: TimeInterval(createdAt))
         )
@@ -125,5 +131,13 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
 
     private static func decodedSource(from text: String) -> KnowledgeEntrySource? {
         try? JSONDecoder().decode(KnowledgeEntrySource.self, from: Data(text.utf8))
+    }
+
+    private func addOriginColumnIfMissing() async throws {
+        let columns = try await database.run("PRAGMA table_info(knowledge_entries);")
+        guard !columns.contains(where: { $0["name"]?.text == "origin" }) else { return }
+
+        try await database.execute(
+            "ALTER TABLE knowledge_entries ADD COLUMN origin TEXT NOT NULL DEFAULT 'classified';")
     }
 }

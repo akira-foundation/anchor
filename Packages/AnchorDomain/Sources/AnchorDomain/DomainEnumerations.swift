@@ -11,7 +11,7 @@ public enum AgentProvider: String, Sendable, Codable {
     case graphify
 }
 
-public enum ConversationRole: String, Sendable, Codable {
+public enum ConversationRole: String, Sendable, Codable, CaseIterable {
     case user
     case assistant
     case system
@@ -21,6 +21,12 @@ public enum ConversationRole: String, Sendable, Codable {
 public enum KnowledgeEntryState: String, Sendable, Codable {
     case current
     case superseded
+}
+
+public enum KnowledgeEntryOrigin: String, Sendable, Codable {
+    case classified
+    case marked
+    case inferred
 }
 
 public enum KnowledgeEntryKind: String, Sendable, Codable, CaseIterable {

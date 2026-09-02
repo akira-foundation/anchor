@@ -59,6 +59,20 @@ struct MarkerPositionTests {
         #expect(entries.map(\.summaryText) == ["retry the upload after 3 attempts."])
     }
 
+    @Test(
+        "a marker an agent wrote in bold is still a marker",
+        arguments: [
+            "**DECISION:** keep the journal local",
+            "__DECISION:__ keep the journal local",
+            "- **DECISION:** keep the journal local",
+        ]
+    )
+    func markerAgentWroteInBoldIsStillMarker(line: String) async throws {
+        let entries = try await MarkedKnowledgeExtractor().extractEntries(for: request(line))
+
+        #expect(entries.map(\.summaryText) == ["keep the journal local"])
+    }
+
     @Test("a marker with nothing after it marks nothing")
     func markerWithNothingAfterItMarksNothing() async throws {
         let entries = try await MarkedKnowledgeExtractor()

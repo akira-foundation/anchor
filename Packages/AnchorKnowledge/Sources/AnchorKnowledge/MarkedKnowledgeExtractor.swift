@@ -43,19 +43,21 @@ public struct MarkedKnowledgeExtractor: KnowledgeExtracting {
     }
 
     private static let listPunctuation: Set<Character> = ["-", "*", ">", "#", ".", " ", "\t"]
+    private static let emphasis: Set<Character> = ["*", "_"]
 
     private static func marked(
         in line: String
     ) -> (kind: KnowledgeEntryKind, summaryText: String)? {
         let opening = String(
-            line.drop { listPunctuation.contains($0) || $0.isNumber })
+            line.drop { listPunctuation.contains($0) || emphasis.contains($0) || $0.isNumber })
         let uppercased = opening.uppercased()
 
         for (marker, kind) in markers {
             guard uppercased.hasPrefix(marker) else { continue }
 
-            let summaryText = String(opening.dropFirst(marker.count))
-                .trimmingCharacters(in: .whitespaces)
+            let summaryText = String(
+                opening.dropFirst(marker.count).drop { emphasis.contains($0) || $0 == " " }
+            ).trimmingCharacters(in: .whitespaces)
 
             guard !summaryText.isEmpty else { continue }
 

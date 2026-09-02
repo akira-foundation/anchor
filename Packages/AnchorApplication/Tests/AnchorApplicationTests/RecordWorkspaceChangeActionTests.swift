@@ -81,7 +81,22 @@ struct RecordWorkspaceChangeActionTests {
             )
         )
 
-        #expect(outcome == .recorded(revisionCount: 2))
+        guard case .recorded(let recorded) = outcome else {
+            Issue.record("expected the change to be recorded")
+
+            return
+        }
+
+        #expect(recorded.count == 2)
+        #expect(Set(recorded.map(\.artifact.name)).count == 2)
+        #expect(Set(recorded.map(\.revisionID)).count == 2)
+
+        for entry in recorded {
+            let latest = try await journal.latestRevision(forArtifact: entry.artifact.id)
+
+            #expect(latest?.id == entry.revisionID)
+            #expect(latest?.contentHash == entry.contentHash)
+        }
         #expect(await journal.recordedRevisions.count == 2)
     }
 
@@ -103,7 +118,7 @@ struct RecordWorkspaceChangeActionTests {
         _ = try await action.perform(request)
         let second = try await action.perform(request)
 
-        #expect(second == .recorded(revisionCount: 0))
+        #expect(second == .recorded([]))
         #expect(await journal.recordedRevisions.count == 1)
     }
 }

@@ -1,6 +1,8 @@
 import AnchorApplication
 import AnchorDomain
+import AnchorKnowledge
 import AnchorPersistence
+import AnchorSearch
 import AnchorStorage
 import AnchorSync
 import Foundation
@@ -11,7 +13,8 @@ public enum ContextEngineAssembly {
         observedWorkspace: ObservedWorkspace,
         storage: AssembledContextStorage,
         supportDirectoryURL: URL,
-        sessionFileIndex: SessionFileIndex? = nil
+        sessionFileIndex: SessionFileIndex? = nil,
+        sessionContext: SessionContextRecording? = nil
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
         let projectID = observedWorkspace.projectID
@@ -35,7 +38,8 @@ public enum ContextEngineAssembly {
                 operationJournal: operationJournal
             ),
             synchronizer: makeSynchronizer(storage: storage, operations: operationJournal),
-            presences: makePresences(storage: storage)
+            presences: makePresences(storage: storage),
+            sessionContext: sessionContext
         )
     }
 
@@ -53,16 +57,57 @@ public enum ContextEngineAssembly {
         return try? await SessionFileIndex(database: database)
     }
 
+    public static func makeSessionContext(
+        storage: AssembledContextStorage
+    ) async throws -> AssembledSessionContext {
+        let database = try SQLiteDatabase(fileURL: nil)
+        let search = try await SQLiteContextSearch(database: database)
+        let action = RecordSessionContextAction(
+            index: SearchedTranscriptIndex(search: search),
+            knowledge: ExtractedSessionKnowledge(
+                extractor: MarkedKnowledgeExtractor(),
+                store: try await SQLiteKnowledgeStore(database: database)
+            )
+        )
+
+        return AssembledSessionContext(
+            search: search,
+            recorder: StoredSessionContextRecorder(
+                contentStore: StoredArtifactContentStore(storage: storage.local), action: action),
+            rebuilder: DiscoveredSessionContextRebuilder(action: action)
+        )
+    }
+
+    public static func sessionsOnDisk(
+        forProject projectID: ProjectID,
+        inWorkspaceAt workspaceURL: URL,
+        sessionFileIndex: SessionFileIndex? = nil
+    ) -> [(artifact: Artifact, content: Data)] {
+        claudeSessions().sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
+            + codexSessions(indexedBy: sessionFileIndex)
+            .sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
+    }
+
+    private static func claudeSessions() -> ClaudeSessionArtifacts {
+        ClaudeSessionArtifacts()
+    }
+
+    private static func codexSessions(
+        indexedBy sessionFileIndex: SessionFileIndex?
+    ) -> CodexSessionArtifacts {
+        CodexSessionArtifacts(index: sessionFileIndex)
+    }
+
     private static func makeDiscoverer(
         workspaceURL: URL, sessionFileIndex: SessionFileIndex?
     ) -> CompositeArtifactDiscoverer {
         CompositeArtifactDiscoverer([
             SuperpowersArtifactProvider(workspaceURL: workspaceURL),
             GraphifyArtifactProvider(workspaceURL: workspaceURL),
-            ClaudeSessionProvider(workspaceURL: workspaceURL),
+            ClaudeSessionProvider(workspaceURL: workspaceURL, artifacts: claudeSessions()),
             CodexSessionProvider(
                 workspaceURL: workspaceURL,
-                artifacts: CodexSessionArtifacts(index: sessionFileIndex)
+                artifacts: codexSessions(indexedBy: sessionFileIndex)
             ),
         ])
     }

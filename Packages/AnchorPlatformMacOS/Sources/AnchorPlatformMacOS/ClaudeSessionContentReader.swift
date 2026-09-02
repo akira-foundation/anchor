@@ -16,7 +16,7 @@ public struct ClaudeSessionContentReader: ArtifactContentReading {
         ofArtifactNamed name: String,
         inWorkspaceAt workspaceURL: URL
     ) async throws -> Data? {
-        guard name.hasPrefix(SessionArtifact.canonicalPrefix(for: .claude)) else { return nil }
+        guard AgentSessionArtifactNaming.names(name, aSessionOf: .claude) else { return nil }
 
         return artifacts.sessionArtifacts(forProject: projectID, inWorkspaceAt: workspaceURL)
             .first { $0.artifact.name == name }?

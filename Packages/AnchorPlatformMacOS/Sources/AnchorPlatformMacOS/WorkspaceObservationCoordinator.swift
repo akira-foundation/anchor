@@ -13,6 +13,7 @@ public actor WorkspaceObservationCoordinator {
     private let recordChange: RecordWorkspaceChangeAction
     private let synchronizer: any ArtifactRevisionSynchronizing
     private let presences: any DevicePresenceRegistry
+    private let sessionContext: SessionContextRecording?
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var refusals: [String] = []
@@ -26,6 +27,7 @@ public actor WorkspaceObservationCoordinator {
         recordChange: RecordWorkspaceChangeAction,
         synchronizer: any ArtifactRevisionSynchronizing,
         presences: any DevicePresenceRegistry,
+        sessionContext: SessionContextRecording? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.device = device
@@ -35,6 +37,7 @@ public actor WorkspaceObservationCoordinator {
         self.recordChange = recordChange
         self.synchronizer = synchronizer
         self.presences = presences
+        self.sessionContext = sessionContext
         self.now = now
     }
 
@@ -80,10 +83,19 @@ public actor WorkspaceObservationCoordinator {
     }
 
     private func handle(_ change: WorkspaceChange, forProject projectID: ProjectID) async {
+        var outcome: RecordWorkspaceChangeOutcome = .deviceCannotDiscover
         let recorded = await recording("recording the change") {
-            _ = try await recordChange.perform(
+            outcome = try await recordChange.perform(
                 RecordWorkspaceChangeRequest(device: device, projectID: projectID, change: change)
             )
+        }
+
+        if recorded, case .recorded(let revisions) = outcome {
+            for refusal in await sessionContext?.recordSessionContext(in: revisions, at: now())
+                ?? []
+            {
+                remember("indexing \(refusal.artifactName)", refusal.description)
+            }
         }
 
         if recorded, let reached = await observer.latestCheckpoint() {
@@ -98,6 +110,12 @@ public actor WorkspaceObservationCoordinator {
         }
     }
 
+    private func remember(_ attempt: String, _ description: String) {
+        refusalCount += 1
+        refusals.append("\(attempt): \(description)")
+        refusals = refusals.suffix(Self.rememberedRefusalCount)
+    }
+
     @discardableResult
     private func recording(
         _ attempt: String, _ work: () async throws -> Void
@@ -107,9 +125,7 @@ public actor WorkspaceObservationCoordinator {
 
             return true
         } catch {
-            refusalCount += 1
-            refusals.append("\(attempt): \(error)")
-            refusals = refusals.suffix(Self.rememberedRefusalCount)
+            remember(attempt, "\(error)")
 
             return false
         }

@@ -22,6 +22,12 @@ struct AnchorMacRootView: View {
         .task { await contextEngine.refreshRefusals() }
     }
 
+    private func indexSuffix(_ indexedSessions: Int?) -> String {
+        guard let indexedSessions else { return "\nSearch is off: the index could not be built" }
+
+        return "\n\(indexedSessions) sessions searchable"
+    }
+
     private func refusalSuffix(_ refusals: [String]) -> String {
         guard let latest = refusals.last else { return "" }
 
@@ -32,12 +38,12 @@ struct AnchorMacRootView: View {
         switch contextEngine.state {
         case .idle:
             return "Not watching yet"
-        case .watching(let projectName, .synchronized, let refusals):
+        case .watching(let projectName, .synchronized, let indexed, let refusals):
             return "Watching \(projectName), synchronized with iCloud"
-                + refusalSuffix(refusals)
-        case .watching(let projectName, .localOnlyUntilAccountReturns, let refusals):
+                + indexSuffix(indexed) + refusalSuffix(refusals)
+        case .watching(let projectName, .localOnlyUntilAccountReturns, let indexed, let refusals):
             return "Watching \(projectName), on this Mac only. iCloud was unreachable at launch"
-                + refusalSuffix(refusals)
+                + indexSuffix(indexed) + refusalSuffix(refusals)
         case .noWorkspaceConfigured:
             return "No workspace configured"
         case .failed(let description):

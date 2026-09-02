@@ -3,19 +3,12 @@ import AnchorProvider
 import Foundation
 
 public enum SessionArtifact {
-    public static func canonicalPrefix(for provider: AgentProvider) -> String {
-        "sessions/\(provider.rawValue)"
-    }
-
-    public static func name(forSession sessionID: SessionID, provider: AgentProvider) -> String {
-        "\(canonicalPrefix(for: provider))/\(sessionID.rawValue).json"
-    }
-
     public static func make(
         from transcript: AgentTranscript, forProject projectID: ProjectID
     ) -> (artifact: Artifact, content: Data)? {
         let provider = transcript.session.provider
-        let name = name(forSession: transcript.session.id, provider: provider)
+        let name = AgentSessionArtifactNaming.name(
+            forSession: transcript.session.id, provider: provider)
 
         guard
             let artifact = Artifact(

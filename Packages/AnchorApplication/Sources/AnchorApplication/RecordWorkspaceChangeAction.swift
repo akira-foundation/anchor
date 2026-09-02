@@ -14,8 +14,20 @@ public struct RecordWorkspaceChangeRequest: Sendable, Equatable {
     }
 }
 
+public struct RecordedArtifactRevision: Sendable, Equatable {
+    public let artifact: Artifact
+    public let revisionID: RevisionID
+    public let contentHash: ContentHash
+
+    public init(artifact: Artifact, revisionID: RevisionID, contentHash: ContentHash) {
+        self.artifact = artifact
+        self.revisionID = revisionID
+        self.contentHash = contentHash
+    }
+}
+
 public enum RecordWorkspaceChangeOutcome: Sendable, Equatable {
-    case recorded(revisionCount: Int)
+    case recorded([RecordedArtifactRevision])
     case deviceCannotDiscover
 }
 
@@ -42,7 +54,7 @@ public struct RecordWorkspaceChangeAction: Action {
     ) async throws -> RecordWorkspaceChangeOutcome {
         guard request.device.canDiscoverLocalProviders else { return .deviceCannotDiscover }
 
-        var recordedCount = 0
+        var recorded: [RecordedArtifactRevision] = []
         for discovered in try await discoverer.discoverArtifacts(forProject: request.projectID) {
             let revision = try await revisionRecorder.recordRevision(
                 of: discovered.artifact,
@@ -59,9 +71,14 @@ public struct RecordWorkspaceChangeAction: Action {
             }
 
             _ = try await operationJournal.queueOperation(for: revision, storageKey: storageKey)
-            recordedCount += 1
+            recorded.append(
+                RecordedArtifactRevision(
+                    artifact: discovered.artifact,
+                    revisionID: revision.id,
+                    contentHash: revision.contentHash
+                ))
         }
 
-        return .recorded(revisionCount: recordedCount)
+        return .recorded(recorded)
     }
 }

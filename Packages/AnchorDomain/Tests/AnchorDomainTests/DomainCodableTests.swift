@@ -95,7 +95,7 @@ struct DomainCodableTests {
                 projectID: ProjectID(),
                 kind: .architecture,
                 summaryText: "AnchorDomain depends only on AnchorFoundation",
-                source: .session(SessionID(), messageIDs: [MessageID()]),
+                source: .session(SessionID()),
                 sourceContentHash: ContentHash.digest(of: Data("source".utf8)),
                 createdAt: Self.fixedDate
             )

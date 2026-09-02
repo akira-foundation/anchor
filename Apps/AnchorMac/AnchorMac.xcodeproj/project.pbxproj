@@ -11,6 +11,9 @@
 		074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */ = {isa = PBXBuildFile; productRef = A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */; };
 		074F80113045954F00FF709E /* AnchorStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A3D0000000000000000000A3 /* AnchorStorage */; };
 		65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */; };
+		075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A5D0000000000000000000A5 /* AnchorSearch */; };
+		075F80103045954F00FF7001 /* AnchorKnowledge in Frameworks */ = {isa = PBXBuildFile; productRef = A6D0000000000000000000A6 /* AnchorKnowledge */; };
+		075F80113045954F00FF7002 /* AnchorPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A7D0000000000000000000A7 /* AnchorPersistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +37,9 @@
 				074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */,
 				074F800F3045954F00FF709E /* AnchorPlatformMacOS in Frameworks */,
 				65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */,
+				075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */,
+				075F80103045954F00FF7001 /* AnchorKnowledge in Frameworks */,
+				075F80113045954F00FF7002 /* AnchorPersistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -80,6 +86,9 @@
 				A1D0000000000000000000A1 /* AnchorPlatformMacOS */,
 				A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */,
 				A3D0000000000000000000A3 /* AnchorStorage */,
+				A5D0000000000000000000A5 /* AnchorSearch */,
+				A6D0000000000000000000A6 /* AnchorKnowledge */,
+				A7D0000000000000000000A7 /* AnchorPersistence */,
 			);
 			productName = AnchorMac;
 			productReference = 4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */;
@@ -114,6 +123,9 @@
 				B1D0000000000000000000B1 /* XCLocalSwiftPackageReference "../../Packages/AnchorPlatformMacOS" */,
 				B2D0000000000000000000B2 /* XCLocalSwiftPackageReference "../../Packages/AnchorPlatformAppleCloud" */,
 				B3D0000000000000000000B3 /* XCLocalSwiftPackageReference "../../Packages/AnchorStorage" */,
+				B5D0000000000000000000B5 /* XCLocalSwiftPackageReference "../../Packages/AnchorSearch" */,
+				B6D0000000000000000000B6 /* XCLocalSwiftPackageReference "../../Packages/AnchorKnowledge" */,
+				B7D0000000000000000000B7 /* XCLocalSwiftPackageReference "../../Packages/AnchorPersistence" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0C1453DE0237AB3065FD4CB1 /* Products */;
@@ -276,6 +288,18 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/AnchorStorage;
 		};
+		B5D0000000000000000000B5 /* XCLocalSwiftPackageReference "../../Packages/AnchorSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorSearch;
+		};
+		B6D0000000000000000000B6 /* XCLocalSwiftPackageReference "../../Packages/AnchorKnowledge" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorKnowledge;
+		};
+		B7D0000000000000000000B7 /* XCLocalSwiftPackageReference "../../Packages/AnchorPersistence" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorPersistence;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -294,6 +318,18 @@
 		F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AnchorSharedUI;
+		};
+		A5D0000000000000000000A5 /* AnchorSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorSearch;
+		};
+		A6D0000000000000000000A6 /* AnchorKnowledge */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorKnowledge;
+		};
+		A7D0000000000000000000A7 /* AnchorPersistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorPersistence;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

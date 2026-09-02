@@ -1,3 +1,4 @@
+import AnchorPersistence
 import AnchorPlatformAppleCloud
 import AnchorPlatformMacOS
 import AnchorStorage
@@ -10,7 +11,12 @@ import Observation
 final class AnchorMacContextEngine {
     enum State: Equatable {
         case idle
-        case watching(projectName: String, storage: ContextStorageChoice, refusals: [String])
+        case watching(
+            projectName: String,
+            storage: ContextStorageChoice,
+            indexedSessions: Int?,
+            refusals: [String]
+        )
         case noWorkspaceConfigured
         case failed(String)
     }
@@ -48,12 +54,15 @@ final class AnchorMacContextEngine {
 
     func refreshRefusals() async {
         guard let coordinator,
-            case .watching(let projectName, let storage, _) = state
+            case .watching(let projectName, let storage, let indexedSessions, _) = state
         else { return }
 
         state = .watching(
-            projectName: projectName, storage: storage,
-            refusals: await coordinator.recordedRefusals)
+            projectName: projectName,
+            storage: storage,
+            indexedSessions: indexedSessions,
+            refusals: await coordinator.recordedRefusals
+        )
     }
 
     func stop() async {
@@ -87,13 +96,25 @@ final class AnchorMacContextEngine {
             key: try SynchronizedEncryptionKeyStore().keyCreatingIfNeeded()
         )
 
+        let sessionFileIndex = await ContextEngineAssembly.makeSessionFileIndex(
+            inSupportDirectoryAt: supportDirectoryURL)
+        let sessionContext = try? await ContextEngineAssembly.makeSessionContext(storage: storage)
+        let rebuild = await sessionContext?.rebuilder.rebuild(
+            from: ContextEngineAssembly.sessionsOnDisk(
+                forProject: observed.projectID,
+                inWorkspaceAt: observed.workspaceURL,
+                sessionFileIndex: sessionFileIndex
+            ),
+            at: Date()
+        )
+
         let assembled = ContextEngineAssembly.makeCoordinator(
             device: device,
             observedWorkspace: observed,
             storage: storage,
             supportDirectoryURL: supportDirectoryURL,
-            sessionFileIndex: await ContextEngineAssembly.makeSessionFileIndex(
-                inSupportDirectoryAt: supportDirectoryURL)
+            sessionFileIndex: sessionFileIndex,
+            sessionContext: sessionContext?.recorder
         )
 
         try await assembled.startObserving(
@@ -101,7 +122,11 @@ final class AnchorMacContextEngine {
 
         coordinator = assembled
         state = .watching(
-            projectName: observed.projectName, storage: storage.choice, refusals: [])
+            projectName: observed.projectName,
+            storage: storage.choice,
+            indexedSessions: rebuild?.indexedSessions,
+            refusals: []
+        )
     }
 
     private static func reachCloudKit() async -> (any StorageProvider)? {

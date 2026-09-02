@@ -1,5 +1,6 @@
 import AnchorApplication
 import AnchorDomain
+import AnchorIntelligence
 import AnchorKnowledge
 import AnchorPersistence
 import AnchorSearch
@@ -58,7 +59,7 @@ public enum ContextEngineAssembly {
     }
 
     public static func makeSessionContext(
-        storage: AssembledContextStorage
+        storage: AssembledContextStorage, inferringKnowledge: Bool = false
     ) async throws -> AssembledSessionContext {
         let database = try SQLiteDatabase(fileURL: nil)
         let search = try await SQLiteContextSearch(database: database)
@@ -76,6 +77,15 @@ public enum ContextEngineAssembly {
                 contentStore: StoredArtifactContentStore(storage: storage.local), action: action),
             rebuilder: DiscoveredSessionContextRebuilder(action: action)
         )
+    }
+
+    private static func makeKnowledgeExtractor(inferring: Bool) -> any KnowledgeExtracting {
+        guard inferring else { return MarkedKnowledgeExtractor() }
+
+        return CompositeKnowledgeExtractor([
+            MarkedKnowledgeExtractor(),
+            InferredKnowledgeExtractor(inference: OnDeviceStatementInference()),
+        ])
     }
 
     public static func sessionsOnDisk(

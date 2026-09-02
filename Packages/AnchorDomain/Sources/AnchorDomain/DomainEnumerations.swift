@@ -23,7 +23,7 @@ public enum KnowledgeEntryState: String, Sendable, Codable {
     case superseded
 }
 
-public enum KnowledgeEntryKind: String, Sendable, Codable {
+public enum KnowledgeEntryKind: String, Sendable, Codable, CaseIterable {
     case summary
     case decision
     case todo

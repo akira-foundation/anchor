@@ -3,7 +3,7 @@ import Foundation
 public enum ClaudeSessionsLocation {
     public static func directoryName(forWorkspaceAt workspaceURL: URL) -> String {
         String(
-            workspaceURL.resolvingSymlinksInPath().path().map { character in
+            workspaceURL.resolvingSymlinksInPath().path(percentEncoded: false).map { character in
                 character == "/" || character == "." ? "-" : character
             }
         )

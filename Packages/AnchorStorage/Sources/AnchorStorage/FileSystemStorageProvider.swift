@@ -136,7 +136,8 @@ public actor FileSystemStorageProvider: StorageProvider {
     private func readMetadata(for key: StorageKey) -> StorageObjectMetadata? {
         let fileURL = fileURL(for: key)
         guard let contents = try? Data(contentsOf: fileURL),
-            let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path())
+            let attributes = try? FileManager.default.attributesOfItem(
+                atPath: fileURL.path(percentEncoded: false))
         else {
             return nil
         }
@@ -171,9 +172,9 @@ public actor FileSystemStorageProvider: StorageProvider {
     }
 
     private func relativeKey(of directoryURL: URL) -> StorageKey? {
-        let root = rootURL.resolvingSymlinksInPath().path()
+        let root = rootURL.resolvingSymlinksInPath().path(percentEncoded: false)
         let prefix = root.hasSuffix("/") ? root : root + "/"
-        var path = directoryURL.resolvingSymlinksInPath().path()
+        var path = directoryURL.resolvingSymlinksInPath().path(percentEncoded: false)
         while path.hasSuffix("/") { path.removeLast() }
         guard path.hasPrefix(prefix) else { return nil }
 

@@ -201,6 +201,50 @@ struct WorkspaceObservationCoordinatorTests {
         return seen
     }
 
+    @Test("stopping a coordinator that never started is not a failure")
+    func stoppingCoordinatorThatNeverStartedIsNotAFailure() async throws {
+        let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "plan"])
+        let mac = Device(id: DeviceID(), displayName: "Studio", platform: .macOS)
+        let (coordinator, _) = makeCoordinator(
+            device: mac, storage: InMemoryStorageProvider(),
+            checkpointStore: ObservationCheckpointStore(fileURL: makeCheckpointURL()),
+            workspaceURL: workspace)
+
+        await coordinator.stopObserving()
+
+        #expect(await coordinator.isObserving == false)
+    }
+
+    @Test("starting a coordinator that is already observing does not start a second observation")
+    func startingCoordinatorAlreadyObservingDoesNotStartSecondObservation() async throws {
+        let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "plan"])
+        let mac = Device(id: DeviceID(), displayName: "Studio", platform: .macOS)
+        let (coordinator, _) = makeCoordinator(
+            device: mac, storage: InMemoryStorageProvider(),
+            checkpointStore: ObservationCheckpointStore(fileURL: makeCheckpointURL()),
+            workspaceURL: workspace)
+
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        await coordinator.stopObserving()
+
+        #expect(await coordinator.isObserving == false)
+    }
+
+    @Test("a device that cannot discover locally never begins observing")
+    func deviceThatCannotDiscoverLocallyNeverBeginsObserving() async throws {
+        let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "plan"])
+        let phone = Device(id: DeviceID(), displayName: "Phone", platform: .iOS)
+        let (coordinator, _) = makeCoordinator(
+            device: phone, storage: InMemoryStorageProvider(),
+            checkpointStore: ObservationCheckpointStore(fileURL: makeCheckpointURL()),
+            workspaceURL: workspace)
+
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+
+        #expect(await coordinator.isObserving == false)
+    }
+
     private func makeCheckpointURL() -> URL {
         FileManager.default.temporaryDirectory
             .appending(path: "anchor-coordinator-\(UUID().uuidString)/checkpoints.json")

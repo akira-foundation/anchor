@@ -9,7 +9,8 @@ public enum WorkspacePath {
     }
 
     static func relativePath(of absolutePath: String, under workspaceURL: URL) -> String? {
-        let root = canonicalPath(workspaceURL.resolvingSymlinksInPath().path())
+        let root = canonicalPath(
+            workspaceURL.resolvingSymlinksInPath().path(percentEncoded: false))
         let prefix = root.hasSuffix("/") ? root : root + "/"
         let event = canonicalPath(absolutePath)
         guard event.hasPrefix(prefix) else { return nil }

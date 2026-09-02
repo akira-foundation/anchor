@@ -4,11 +4,11 @@ import Foundation
 
 public enum SessionArtifact {
     public static func canonicalPrefix(for provider: AgentProvider) -> String {
-        "sessions/\(provider.rawValue)"
+        AgentSessionArtifactNaming.canonicalPrefix(for: provider)
     }
 
     public static func name(forSession sessionID: SessionID, provider: AgentProvider) -> String {
-        "\(canonicalPrefix(for: provider))/\(sessionID.rawValue).json"
+        AgentSessionArtifactNaming.name(forSession: sessionID, provider: provider)
     }
 
     public static func make(

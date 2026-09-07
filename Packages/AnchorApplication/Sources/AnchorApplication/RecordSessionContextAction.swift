@@ -20,6 +20,11 @@ public enum RecordSessionContextOutcome: Sendable, Equatable {
     case notASession
 }
 
+public struct RecordSessionContextReport: Sendable, Equatable {
+    public let outcome: RecordSessionContextOutcome
+    public let knowledgeRefusal: String?
+}
+
 public enum RecordSessionContextFailure: Error, Sendable, Equatable {
     case contentIsNotATranscript(ArtifactID)
 }
@@ -36,22 +41,61 @@ public struct RecordSessionContextAction: Action {
     public func perform(
         _ request: RecordSessionContextRequest
     ) async throws -> RecordSessionContextOutcome {
-        guard request.artifact.isAgentSessionTranscript else { return .notASession }
+        guard let prepared = try await prepareSessionContext(from: request) else {
+            return .notASession
+        }
+
+        try await recordKnowledge(
+            from: prepared.messages, for: request, sessionID: prepared.sessionID)
+
+        return .indexed(messageCount: prepared.messages.count)
+    }
+
+    public func recordSessionContext(
+        _ request: RecordSessionContextRequest
+    ) async throws -> RecordSessionContextReport {
+        guard let prepared = try await prepareSessionContext(from: request) else {
+            return RecordSessionContextReport(outcome: .notASession, knowledgeRefusal: nil)
+        }
+
+        do {
+            try await recordKnowledge(
+                from: prepared.messages, for: request, sessionID: prepared.sessionID)
+
+            return RecordSessionContextReport(
+                outcome: .indexed(messageCount: prepared.messages.count), knowledgeRefusal: nil)
+        } catch {
+            return RecordSessionContextReport(
+                outcome: .indexed(messageCount: prepared.messages.count),
+                knowledgeRefusal: "\(error)")
+        }
+    }
+
+    private func prepareSessionContext(
+        from request: RecordSessionContextRequest
+    ) async throws -> (messages: [ConversationMessage], sessionID: SessionID)? {
+        guard request.artifact.isAgentSessionTranscript else { return nil }
 
         let transcript = try decodeTranscript(in: request)
 
         try await index.indexTranscript(transcript)
 
-        let messages = transcript.inConversationOrder.messages
+        return (transcript.inConversationOrder.messages, transcript.session.id)
+    }
+
+    private func recordKnowledge(
+        from messages: [ConversationMessage],
+        for request: RecordSessionContextRequest,
+        sessionID: SessionID
+    ) async throws {
         try await knowledge.recordKnowledge(
-            fromText: messages.map(\.content).joined(separator: "\n"),
+            fromText: messages.map { "\($0.role.rawValue): \($0.content)" }
+                .joined(separator: "\n"),
             forProject: request.artifact.projectID,
-            source: .session(transcript.session.id),
+            source: .session(sessionID),
             sourceContentHash: request.contentHash,
             at: request.recordedAt
         )
-
-        return .indexed(messageCount: messages.count)
     }
 
     private func decodeTranscript(

@@ -19,15 +19,22 @@ public struct ExtractedSessionKnowledge: AgentSessionKnowledgeRecording {
         sourceContentHash: ContentHash,
         at instant: Date
     ) async throws {
-        let entries = try await extractor.extractEntries(
-            for: KnowledgeExtractionRequest(
-                text: text,
-                projectID: projectID,
-                source: source,
-                sourceContentHash: sourceContentHash,
-                extractedAt: instant
-            ))
+        let request = KnowledgeExtractionRequest(
+            text: text,
+            projectID: projectID,
+            source: source,
+            sourceContentHash: sourceContentHash,
+            extractedAt: instant
+        )
 
-        try await store.recordEntries(entries, supersedingEntriesFrom: source)
+        do {
+            let entries = try await extractor.extractEntries(for: request)
+
+            try await store.recordEntries(entries, supersedingEntriesFrom: source)
+        } catch let refusal as KnowledgeExtractionRefusal {
+            try await store.recordEntries(refusal.extractedEntries, supersedingEntriesFrom: source)
+
+            throw refusal
+        }
     }
 }

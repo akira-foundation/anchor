@@ -1,5 +1,6 @@
 import AnchorApplication
 import AnchorDomain
+import AnchorIntelligence
 import AnchorKnowledge
 import AnchorPersistence
 import AnchorSearch
@@ -14,7 +15,8 @@ public enum ContextEngineAssembly {
         storage: AssembledContextStorage,
         supportDirectoryURL: URL,
         sessionFileIndex: SessionFileIndex? = nil,
-        sessionContext: SessionContextRecording? = nil
+        sessionContext: SessionContextRecording? = nil,
+        initialRefusals: [String] = []
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
         let projectID = observedWorkspace.projectID
@@ -39,7 +41,8 @@ public enum ContextEngineAssembly {
             ),
             synchronizer: makeSynchronizer(storage: storage, operations: operationJournal),
             presences: makePresences(storage: storage),
-            sessionContext: sessionContext
+            sessionContext: sessionContext,
+            initialRefusals: initialRefusals
         )
     }
 
@@ -58,24 +61,51 @@ public enum ContextEngineAssembly {
     }
 
     public static func makeSessionContext(
-        storage: AssembledContextStorage
+        storage: AssembledContextStorage,
+        inferringKnowledge: Bool = false,
+        statementInference: (any StatementInferring)? = nil
     ) async throws -> AssembledSessionContext {
         let database = try SQLiteDatabase(fileURL: nil)
         let search = try await SQLiteContextSearch(database: database)
+        let inference = configuredInference(
+            inferringKnowledge: inferringKnowledge, statementInference: statementInference)
         let action = RecordSessionContextAction(
             index: SearchedTranscriptIndex(search: search),
             knowledge: ExtractedSessionKnowledge(
-                extractor: MarkedKnowledgeExtractor(),
+                extractor: knowledgeExtractor(statementInference: inference),
                 store: try await SQLiteKnowledgeStore(database: database)
             )
         )
+        let actionPipeline = SessionContextActionPipeline(action: action)
 
         return AssembledSessionContext(
             search: search,
             recorder: StoredSessionContextRecorder(
-                contentStore: StoredArtifactContentStore(storage: storage.local), action: action),
-            rebuilder: DiscoveredSessionContextRebuilder(action: action)
+                contentStore: StoredArtifactContentStore(storage: storage.local),
+                actionPipeline: actionPipeline),
+            rebuilder: DiscoveredSessionContextRebuilder(actionPipeline: actionPipeline),
+            statementInference: inference
         )
+    }
+
+    private static func configuredInference(
+        inferringKnowledge: Bool,
+        statementInference: (any StatementInferring)?
+    ) -> (any StatementInferring)? {
+        guard inferringKnowledge else { return nil }
+
+        return statementInference ?? OnDeviceStatementInference()
+    }
+
+    private static func knowledgeExtractor(
+        statementInference: (any StatementInferring)?
+    ) -> any KnowledgeExtracting {
+        guard let statementInference else { return MarkedKnowledgeExtractor() }
+
+        return CompositeKnowledgeExtractor([
+            MarkedKnowledgeExtractor(),
+            InferredKnowledgeExtractor(inference: statementInference),
+        ])
     }
 
     public static func sessionsOnDisk(

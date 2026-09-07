@@ -4,10 +4,14 @@ import AnchorProvider
 import Foundation
 
 public struct DiscoveredSessionContextRebuilder: Sendable {
-    private let action: RecordSessionContextAction
+    private let actionPipeline: SessionContextActionPipeline
 
     public init(action: RecordSessionContextAction) {
-        self.action = action
+        actionPipeline = SessionContextActionPipeline(action: action)
+    }
+
+    init(actionPipeline: SessionContextActionPipeline) {
+        self.actionPipeline = actionPipeline
     }
 
     public struct Rebuild: Sendable, Hashable {
@@ -24,17 +28,25 @@ public struct DiscoveredSessionContextRebuilder: Sendable {
 
         for session in sessions where session.artifact.isAgentSessionTranscript {
             do {
-                let outcome = try await action.perform(
-                    RecordSessionContextRequest(
-                        artifact: session.artifact,
-                        content: session.content,
-                        contentHash: ContentHash.digest(of: session.content),
-                        recordedAt: instant
-                    ))
+                guard
+                    let report = try await actionPipeline.rebuildSessionContext(
+                        RecordSessionContextRequest(
+                            artifact: session.artifact,
+                            content: session.content,
+                            contentHash: ContentHash.digest(of: session.content),
+                            recordedAt: instant
+                        ))
+                else { continue }
 
-                guard case .indexed = outcome else { continue }
+                guard case .indexed = report.outcome else { continue }
 
                 indexedSessions += 1
+
+                guard let description = report.knowledgeRefusal else { continue }
+
+                refusals.append(
+                    SessionContextRefusal(
+                        artifactName: session.artifact.name, description: description))
             } catch {
                 refusals.append(
                     SessionContextRefusal(

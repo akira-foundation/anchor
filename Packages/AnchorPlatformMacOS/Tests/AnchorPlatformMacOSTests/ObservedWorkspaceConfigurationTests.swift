@@ -182,3 +182,62 @@ struct AbsentObservedWorkspaceTests {
         #expect(try ObservedWorkspaceConfiguration(fileURL: fileURL).observedWorkspace() != nil)
     }
 }
+
+@Suite("Whether this machine was asked to infer knowledge")
+struct InferredKnowledgeConfigurationTests {
+    private func writing(_ contents: String) throws -> URL {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "anchor-workspace-\(UUID().uuidString).json")
+        try Data(contents.utf8).write(to: fileURL)
+
+        return fileURL
+    }
+
+    private func makeWorkspace() throws -> String {
+        let workspace = FileManager.default.temporaryDirectory
+            .appending(path: "anchor-inference/\(UUID().uuidString)/anchor")
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+
+        return workspace.path(percentEncoded: false)
+    }
+
+    @Test("a machine that was not asked does not infer")
+    func machineThatWasNotAskedDoesNotInfer() throws {
+        let fileURL = try writing(
+            #"{"workspacePath": "\#(try makeWorkspace())", "projectName": "anchor"}"#)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let observed = try #require(
+            try ObservedWorkspaceConfiguration(fileURL: fileURL).observedWorkspace())
+
+        #expect(!observed.infersKnowledge)
+    }
+
+    @Test("a machine that was asked infers")
+    func machineThatWasAskedInfers() throws {
+        let fileURL = try writing(
+            #"""
+            {"workspacePath": "\#(try makeWorkspace())", "projectName": "anchor", "infersKnowledge": true}
+            """#)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let observed = try #require(
+            try ObservedWorkspaceConfiguration(fileURL: fileURL).observedWorkspace())
+
+        #expect(observed.infersKnowledge)
+    }
+
+    @Test("asking not to infer is the same as not asking")
+    func askingNotToInferIsSameAsNotAsking() throws {
+        let fileURL = try writing(
+            #"""
+            {"workspacePath": "\#(try makeWorkspace())", "projectName": "anchor", "infersKnowledge": false}
+            """#)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let observed = try #require(
+            try ObservedWorkspaceConfiguration(fileURL: fileURL).observedWorkspace())
+
+        #expect(!observed.infersKnowledge)
+    }
+}

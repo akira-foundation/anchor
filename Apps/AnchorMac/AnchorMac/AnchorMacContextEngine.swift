@@ -15,6 +15,7 @@ final class AnchorMacContextEngine {
             projectName: String,
             storage: ContextStorageChoice,
             indexedSessions: Int?,
+            inferenceStatus: KnowledgeInferenceStatus,
             refusals: [String]
         )
         case noWorkspaceConfigured
@@ -27,6 +28,9 @@ final class AnchorMacContextEngine {
 
     private let supportDirectoryURL: URL?
     private var coordinator: WorkspaceObservationCoordinator?
+    private var assembledSessionContext: AssembledSessionContext?
+    private var rebuildSessionContextIfInferenceBecameReady:
+        ((KnowledgeInferenceStatus) async -> DiscoveredSessionContextRebuilder.Rebuild?)?
     private var isStarting = false
 
     init(supportDirectoryURL: URL? = AnchorMacContextEngine.defaultSupportDirectoryURL) {
@@ -54,13 +58,23 @@ final class AnchorMacContextEngine {
 
     func refreshRefusals() async {
         guard let coordinator,
-            case .watching(let projectName, let storage, let indexedSessions, _) = state
+            case .watching(
+                let projectName, let storage, let indexedSessions, let inferenceStatus, _) =
+                state
         else { return }
+        let currentInferenceStatus = await assembledSessionContext?.inferenceStatus()
+        let recovered = await rebuildSessionContextIfInferenceBecameReady?(inferenceStatus)
+
+        if let recovered {
+            await coordinator.recordRefusals(
+                recovered.refusals.map { "indexing \($0.artifactName): \($0.description)" })
+        }
 
         state = .watching(
             projectName: projectName,
             storage: storage,
-            indexedSessions: indexedSessions,
+            indexedSessions: recovered?.indexedSessions ?? indexedSessions,
+            inferenceStatus: currentInferenceStatus ?? inferenceStatus,
             refusals: await coordinator.recordedRefusals
         )
     }
@@ -68,6 +82,8 @@ final class AnchorMacContextEngine {
     func stop() async {
         await coordinator?.stopObserving()
         coordinator = nil
+        assembledSessionContext = nil
+        rebuildSessionContextIfInferenceBecameReady = nil
         state = .idle
     }
 
@@ -98,15 +114,17 @@ final class AnchorMacContextEngine {
 
         let sessionFileIndex = await ContextEngineAssembly.makeSessionFileIndex(
             inSupportDirectoryAt: supportDirectoryURL)
-        let sessionContext = try? await ContextEngineAssembly.makeSessionContext(storage: storage)
-        let rebuild = await sessionContext?.rebuilder.rebuild(
-            from: ContextEngineAssembly.sessionsOnDisk(
-                forProject: observed.projectID,
-                inWorkspaceAt: observed.workspaceURL,
-                sessionFileIndex: sessionFileIndex
-            ),
-            at: Date()
+        let sessionContext = try? await ContextEngineAssembly.makeSessionContext(
+            storage: storage, inferringKnowledge: observed.infersKnowledge)
+        let sessionsOnDisk = ContextEngineAssembly.sessionsOnDisk(
+            forProject: observed.projectID,
+            inWorkspaceAt: observed.workspaceURL,
+            sessionFileIndex: sessionFileIndex
         )
+        let rebuild = await sessionContext?.rebuilder.rebuild(from: sessionsOnDisk, at: Date())
+        let initialRefusals = (rebuild?.refusals ?? []).map {
+            "indexing \($0.artifactName): \($0.description)"
+        }
 
         let assembled = ContextEngineAssembly.makeCoordinator(
             device: device,
@@ -114,18 +132,34 @@ final class AnchorMacContextEngine {
             storage: storage,
             supportDirectoryURL: supportDirectoryURL,
             sessionFileIndex: sessionFileIndex,
-            sessionContext: sessionContext?.recorder
+            sessionContext: sessionContext?.recorder,
+            initialRefusals: initialRefusals
         )
 
         try await assembled.startObserving(
             workspaceAt: observed.workspaceURL, forProject: observed.projectID)
 
         coordinator = assembled
+        assembledSessionContext = sessionContext
+        rebuildSessionContextIfInferenceBecameReady = { previousStatus in
+            guard let sessionContext else { return nil }
+
+            return await sessionContext.rebuildSessionContextIfInferenceBecameReady(
+                after: previousStatus,
+                from: ContextEngineAssembly.sessionsOnDisk(
+                    forProject: observed.projectID,
+                    inWorkspaceAt: observed.workspaceURL,
+                    sessionFileIndex: sessionFileIndex
+                ),
+                at: Date()
+            )
+        }
         state = .watching(
             projectName: observed.projectName,
             storage: storage.choice,
             indexedSessions: rebuild?.indexedSessions,
-            refusals: []
+            inferenceStatus: await sessionContext?.inferenceStatus() ?? .disabled,
+            refusals: await assembled.recordedRefusals
         )
     }
 

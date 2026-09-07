@@ -5,10 +5,12 @@ import Foundation
 public struct ObservedWorkspace: Sendable, Hashable {
     public let workspaceURL: URL
     public let projectName: String
+    public let infersKnowledge: Bool
 
-    public init(workspaceURL: URL, projectName: String) {
+    public init(workspaceURL: URL, projectName: String, infersKnowledge: Bool = false) {
         self.workspaceURL = URL(filePath: WorkspacePath.comparable(workspaceURL))
         self.projectName = projectName
+        self.infersKnowledge = infersKnowledge
     }
 
     public var projectID: ProjectID { .derived(fromSeed: projectName) }
@@ -25,6 +27,7 @@ public struct ObservedWorkspaceConfiguration: Sendable {
     private struct StoredConfiguration: Decodable {
         let workspacePath: String?
         let projectName: String?
+        let infersKnowledge: Bool?
     }
 
     public static func defaultFileURL(inSupportDirectoryAt supportDirectoryURL: URL) -> URL {
@@ -51,7 +54,10 @@ public struct ObservedWorkspaceConfiguration: Sendable {
         guard let workspacePath, !workspacePath.isEmpty else { throw .workspaceUnnamed(fileURL) }
 
         let observed = ObservedWorkspace(
-            workspaceURL: URL(filePath: workspacePath), projectName: projectName)
+            workspaceURL: URL(filePath: workspacePath),
+            projectName: projectName,
+            infersKnowledge: stored.infersKnowledge ?? false
+        )
 
         var pointsAtDirectory = ObjCBool(false)
         guard

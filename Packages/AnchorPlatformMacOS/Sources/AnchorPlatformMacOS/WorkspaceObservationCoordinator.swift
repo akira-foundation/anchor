@@ -28,6 +28,7 @@ public actor WorkspaceObservationCoordinator {
         synchronizer: any ArtifactRevisionSynchronizing,
         presences: any DevicePresenceRegistry,
         sessionContext: SessionContextRecording? = nil,
+        initialRefusals: [String] = [],
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.device = device
@@ -38,6 +39,8 @@ public actor WorkspaceObservationCoordinator {
         self.synchronizer = synchronizer
         self.presences = presences
         self.sessionContext = sessionContext
+        refusals = Array(initialRefusals.suffix(Self.rememberedRefusalCount))
+        refusalCount = initialRefusals.count
         self.now = now
     }
 
@@ -46,6 +49,12 @@ public actor WorkspaceObservationCoordinator {
     public var recordedRefusals: [String] { refusals }
 
     public var recordedRefusalCount: Int { refusalCount }
+
+    public func recordRefusals(_ descriptions: [String]) {
+        refusalCount += descriptions.count
+        refusals.append(contentsOf: descriptions)
+        refusals = Array(refusals.suffix(Self.rememberedRefusalCount))
+    }
 
     public func startObserving(
         workspaceAt workspaceURL: URL, forProject projectID: ProjectID

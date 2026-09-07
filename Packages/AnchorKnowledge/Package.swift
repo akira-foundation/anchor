@@ -10,6 +10,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../AnchorDomain"),
+        .package(path: "../AnchorIntelligence"),
         .package(path: "../AnchorPersistence"),
     ],
     targets: [
@@ -18,6 +19,7 @@ let package = Package(
             dependencies: [
                 .product(name: "AnchorDomain", package: "AnchorDomain"),
                 .product(name: "AnchorPersistence", package: "AnchorPersistence"),
+                .product(name: "AnchorIntelligence", package: "AnchorIntelligence"),
             ]
         ),
         .testTarget(

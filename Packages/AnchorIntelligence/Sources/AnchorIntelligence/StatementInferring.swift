@@ -1,3 +1,4 @@
+import AnchorDomain
 import Foundation
 
 public enum InferenceReadiness: Sendable, Hashable {
@@ -18,20 +19,34 @@ public struct StatementInferenceUnavailable: Error, Sendable, Hashable,
 public struct InferenceRequest: Sendable, Hashable {
     public let window: InferenceWindow
     public let kinds: [String]
+    public let evidenceReferences: [InferenceEvidenceReference]
 
-    public init(window: InferenceWindow, kinds: [String]) {
+    public init(
+        window: InferenceWindow, kinds: [String],
+        evidenceReferences: [InferenceEvidenceReference] = []
+    ) {
         self.window = window
         self.kinds = kinds
+        self.evidenceReferences = evidenceReferences
     }
 }
 
 public struct InferredStatement: Sendable, Hashable {
     public let kind: String
     public let summaryText: String
+    public let supportingMessageIDs: [MessageID]
+    public let evidenceText: String
 
-    public init(kind: String, summaryText: String) {
+    public init(
+        kind: String,
+        summaryText: String,
+        supportingMessageIDs: [MessageID] = [],
+        evidenceText: String = ""
+    ) {
         self.kind = kind
         self.summaryText = summaryText
+        self.supportingMessageIDs = supportingMessageIDs
+        self.evidenceText = evidenceText
     }
 }
 
@@ -53,7 +68,11 @@ extension InferredStatement {
 
             guard permitted.contains(kind), !summaryText.isEmpty else { return nil }
 
-            let usable = InferredStatement(kind: kind, summaryText: summaryText)
+            let usable = InferredStatement(
+                kind: kind,
+                summaryText: summaryText,
+                supportingMessageIDs: statement.supportingMessageIDs,
+                evidenceText: statement.evidenceText)
 
             return seen.insert(usable).inserted ? usable : nil
         }

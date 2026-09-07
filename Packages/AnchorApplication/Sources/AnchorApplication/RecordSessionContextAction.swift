@@ -31,11 +31,39 @@ public enum RecordSessionContextFailure: Error, Sendable, Equatable {
 
 public struct RecordSessionContextAction: Action {
     private let index: any AgentTranscriptIndexing
-    private let knowledge: any AgentSessionKnowledgeRecording
+    private let recordKnowledge:
+        @Sendable (
+            [ConversationMessage], ProjectID, KnowledgeEntrySource, ContentHash, Date
+        ) async throws -> Void
 
     public init(index: any AgentTranscriptIndexing, knowledge: any AgentSessionKnowledgeRecording) {
         self.index = index
-        self.knowledge = knowledge
+        recordKnowledge = { messages, projectID, source, sourceContentHash, instant in
+            try await knowledge.recordKnowledge(
+                fromText: messages.map { "\($0.role.rawValue): \($0.content)" }
+                    .joined(separator: "\n"),
+                forProject: projectID,
+                source: source,
+                sourceContentHash: sourceContentHash,
+                at: instant
+            )
+        }
+    }
+
+    public init(
+        index: any AgentTranscriptIndexing,
+        conversationKnowledge: any AgentConversationKnowledgeRecording
+    ) {
+        self.index = index
+        recordKnowledge = { messages, projectID, source, sourceContentHash, instant in
+            try await conversationKnowledge.recordKnowledge(
+                fromMessages: messages,
+                forProject: projectID,
+                source: source,
+                sourceContentHash: sourceContentHash,
+                at: instant
+            )
+        }
     }
 
     public func perform(
@@ -88,13 +116,12 @@ public struct RecordSessionContextAction: Action {
         for request: RecordSessionContextRequest,
         sessionID: SessionID
     ) async throws {
-        try await knowledge.recordKnowledge(
-            fromText: messages.map { "\($0.role.rawValue): \($0.content)" }
-                .joined(separator: "\n"),
-            forProject: request.artifact.projectID,
-            source: .session(sessionID),
-            sourceContentHash: request.contentHash,
-            at: request.recordedAt
+        try await recordKnowledge(
+            messages,
+            request.artifact.projectID,
+            .session(sessionID),
+            request.contentHash,
+            request.recordedAt
         )
     }
 

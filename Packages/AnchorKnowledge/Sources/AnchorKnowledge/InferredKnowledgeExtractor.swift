@@ -18,6 +18,19 @@ public struct InferredKnowledgeExtractor: KnowledgeExtracting {
     public func extractEntries(
         for request: KnowledgeExtractionRequest
     ) async throws -> [KnowledgeEntry] {
+        guard case .conversation(let conversationMessages) = request.content else {
+            return []
+        }
+
+        let authorizedUnits = ConversationAuthoritySelector().authorizedUnits(
+            in: conversationMessages)
+        let authorizedWindow = AuthorizedInferenceWindow(
+            units: authorizedUnits,
+            characterBudget: characterBudget)
+
+        let evidenceReferences = authorizedWindow.evidenceReferences
+        guard !evidenceReferences.isEmpty else { return [] }
+
         switch await inference.readiness() {
         case .ready:
             break
@@ -25,12 +38,16 @@ public struct InferredKnowledgeExtractor: KnowledgeExtracting {
             throw KnowledgeInferenceUnavailable(description: description)
         }
 
-        let window = InferenceWindow(over: request.text, keeping: characterBudget)
-        let statements = try await inference.inferStatements(
-            for: InferenceRequest(window: window, kinds: Self.askedKinds))
+        let candidateStatements = try await inference.inferStatements(
+            for: InferenceRequest(
+                window: authorizedWindow.inferenceWindow,
+                kinds: Self.askedKinds,
+                evidenceReferences: evidenceReferences))
+        let assessment = InferredStatementEvidenceValidator().assess(
+            candidateStatements,
+            in: authorizedWindow)
 
-        return InferredStatement.usable(among: statements, amongKinds: Self.askedKinds)
-            .compactMap { entry(from: $0, for: request) }
+        return assessment.acceptedStatements.compactMap { entry(from: $0, for: request) }
     }
 
     private static let askedKinds = KnowledgeEntryKind.allCases.map(\.rawValue)
@@ -42,16 +59,38 @@ public struct InferredKnowledgeExtractor: KnowledgeExtracting {
 
         return KnowledgeEntry(
             id: KnowledgeEntryID.derived(
-                fromSeed:
-                    "inferred/\(request.sourceContentHash.rawValue)/\(kind.rawValue)/\(statement.summaryText)"
-            ),
+                fromSeed: Self.entryIdentitySeed(
+                    sourceContentHash: request.sourceContentHash,
+                    kind: kind,
+                    summaryText: statement.summaryText,
+                    supportingMessageIDs: statement.supportingMessageIDs)),
             projectID: request.projectID,
             kind: kind,
             summaryText: statement.summaryText,
             source: request.source,
             sourceContentHash: request.sourceContentHash,
             origin: .inferred,
+            supportingMessageIDs: statement.supportingMessageIDs,
             createdAt: request.extractedAt
         )
+    }
+
+    private static func entryIdentitySeed(
+        sourceContentHash: ContentHash,
+        kind: KnowledgeEntryKind,
+        summaryText: String,
+        supportingMessageIDs: [MessageID]
+    ) -> String {
+        let identityComponents =
+            [
+                sourceContentHash.rawValue,
+                kind.rawValue,
+                summaryText,
+            ] + supportingMessageIDs.map(\.rawValue)
+
+        return "inferred/"
+            + identityComponents.map { identityComponent in
+                "\(identityComponent.utf8.count):\(identityComponent)"
+            }.joined()
     }
 }

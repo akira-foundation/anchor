@@ -6,14 +6,68 @@ import Testing
 
 @Suite("File system event observer", .serialized)
 struct FileSystemEventObserverTests {
+    @Test("a buffered change retains its batch checkpoint after newer events arrive")
+    func bufferedChangeRetainsItsBatchCheckpoint() async throws {
+        let workspace = try WorkspaceFixture.make([:])
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let observer = FileSystemEventObserver(silenceWindow: .milliseconds(20))
+        let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/first.json").path],
+                flags: [0], eventIDs: [101]))
+        try await Task.sleep(for: .milliseconds(100))
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/second.json").path],
+                flags: [0], eventIDs: [202]))
+        try await Task.sleep(for: .milliseconds(100))
+        await observer.stopObserving()
+
+        var iterator = changes.makeAsyncIterator()
+        let first = await iterator.next()
+        let second = await iterator.next()
+        #expect(first?.change.changedPaths == ["graphify-out/first.json"])
+        #expect(first?.checkpoint == 101)
+        #expect(second?.change.changedPaths == ["graphify-out/second.json"])
+        #expect(second?.checkpoint == 202)
+        #expect(await iterator.next() == nil)
+    }
+
+    @Test("coalesced paths retain the maximum native event ID")
+    func coalescedPathsRetainMaximumNativeEventID() async throws {
+        let workspace = try WorkspaceFixture.make([:])
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let observer = FileSystemEventObserver(silenceWindow: .milliseconds(20))
+        let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: ["graphify-out/first.json", "graphify-out/second.json"].map {
+                    workspace.appending(path: $0).path
+                }, flags: [0, 0], eventIDs: [505, 202]))
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/third.json").path],
+                flags: [0], eventIDs: [404]))
+        try await Task.sleep(for: .milliseconds(100))
+        await observer.stopObserving()
+
+        var iterator = changes.makeAsyncIterator()
+        let announcement = await iterator.next()
+        #expect(
+            announcement?.change.changedPaths == [
+                "graphify-out/first.json", "graphify-out/second.json", "graphify-out/third.json",
+            ])
+        #expect(announcement?.checkpoint == 505)
+        #expect(await iterator.next() == nil)
+    }
+
     private func firstChange(
         in workspace: URL,
         after write: @escaping @Sendable () throws -> Void
     ) async throws -> WorkspaceChange? {
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(200))
-        let changes = observer.observeWorkspaceChanges(at: workspace)
-
-        try await Task.sleep(for: .milliseconds(400))
+        let changes = try await observer.startWorkspaceObservation(at: workspace)
         try write()
 
         let announced = await withTaskGroup(of: WorkspaceChange?.self) { group in
@@ -50,18 +104,17 @@ struct FileSystemEventObserverTests {
     @Test("a burst of writes is aggregated rather than announced file by file")
     func aBurstOfWritesIsAggregatedRatherThanAnnouncedFileByFile() async throws {
         let workspace = try WorkspaceFixture.make(["graphify-out/graph.json": "{}"])
+        defer { try? FileManager.default.removeItem(at: workspace) }
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(250))
-        let changes = observer.observeWorkspaceChanges(at: workspace)
-
-        try await Task.sleep(for: .milliseconds(400))
+        let changes = try await observer.startWorkspaceObservation(at: workspace)
         for index in 0..<50 {
             try Data("burst \(index)".utf8)
                 .write(to: workspace.appending(path: "graphify-out/file-\(index).json"))
         }
 
         let collector = Task {
-            var announcements: [Int] = []
-            for await change in changes { announcements.append(change.changedPaths.count) }
+            var announcements: [Set<String>] = []
+            for await change in changes { announcements.append(change.changedPaths) }
             return announcements
         }
         try await Task.sleep(for: .seconds(2))
@@ -69,7 +122,10 @@ struct FileSystemEventObserverTests {
         let announcements = await collector.value
 
         #expect(announcements.count < 5)
-        #expect(announcements.reduce(0, +) >= 50)
+        let expectedPaths = Set((0..<50).map { "graphify-out/file-\($0).json" })
+        #expect(
+            announcements.reduce(into: Set<String>()) { $0.formUnion($1) }.isSuperset(
+                of: expectedPaths))
     }
 
     @Test("a change outside the watched locations is never announced")

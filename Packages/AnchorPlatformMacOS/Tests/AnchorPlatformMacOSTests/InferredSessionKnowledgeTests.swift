@@ -32,7 +32,7 @@ struct InferredSessionKnowledgeTests {
         let action = RecordSessionContextAction(
             index: SearchedTranscriptIndex(
                 search: try await SQLiteContextSearch(database: database)),
-            knowledge: ExtractedSessionKnowledge(
+            conversationKnowledge: ExtractedSessionKnowledge(
                 extractor: CompositeKnowledgeExtractor([
                     MarkedKnowledgeExtractor(),
                     InferredKnowledgeExtractor(inference: RefusingStatementInference()),

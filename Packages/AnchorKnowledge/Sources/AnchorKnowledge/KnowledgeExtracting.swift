@@ -1,12 +1,29 @@
 import AnchorDomain
 import Foundation
 
+public enum KnowledgeExtractionContent: Sendable, Hashable {
+    case text(String)
+    case conversation([ConversationMessage])
+
+    public var text: String {
+        switch self {
+        case .text(let text):
+            return text
+        case .conversation(let messages):
+            return messages.map { "\($0.role.rawValue): \($0.content)" }
+                .joined(separator: "\n")
+        }
+    }
+}
+
 public struct KnowledgeExtractionRequest: Sendable, Hashable {
-    public let text: String
+    public let content: KnowledgeExtractionContent
     public let projectID: ProjectID
     public let source: KnowledgeEntrySource
     public let sourceContentHash: ContentHash
     public let extractedAt: Date
+
+    public var text: String { content.text }
 
     public init(
         text: String,
@@ -15,7 +32,21 @@ public struct KnowledgeExtractionRequest: Sendable, Hashable {
         sourceContentHash: ContentHash,
         extractedAt: Date
     ) {
-        self.text = text
+        content = .text(text)
+        self.projectID = projectID
+        self.source = source
+        self.sourceContentHash = sourceContentHash
+        self.extractedAt = extractedAt
+    }
+
+    public init(
+        messages: [ConversationMessage],
+        projectID: ProjectID,
+        source: KnowledgeEntrySource,
+        sourceContentHash: ContentHash,
+        extractedAt: Date
+    ) {
+        content = .conversation(messages)
         self.projectID = projectID
         self.source = source
         self.sourceContentHash = sourceContentHash

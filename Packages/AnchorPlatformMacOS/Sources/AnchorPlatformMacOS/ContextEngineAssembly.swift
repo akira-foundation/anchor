@@ -65,13 +65,26 @@ public enum ContextEngineAssembly {
         inferringKnowledge: Bool = false,
         statementInference: (any StatementInferring)? = nil
     ) async throws -> AssembledSessionContext {
-        let database = try SQLiteDatabase(fileURL: nil)
+        try await makeSessionContext(
+            storage: storage,
+            inferringKnowledge: inferringKnowledge,
+            statementInference: statementInference,
+            database: SQLiteDatabase(fileURL: nil)
+        )
+    }
+
+    static func makeSessionContext(
+        storage: AssembledContextStorage,
+        inferringKnowledge: Bool,
+        statementInference: (any StatementInferring)?,
+        database: SQLiteDatabase
+    ) async throws -> AssembledSessionContext {
         let search = try await SQLiteContextSearch(database: database)
         let inference = configuredInference(
             inferringKnowledge: inferringKnowledge, statementInference: statementInference)
         let action = RecordSessionContextAction(
             index: SearchedTranscriptIndex(search: search),
-            knowledge: ExtractedSessionKnowledge(
+            conversationKnowledge: ExtractedSessionKnowledge(
                 extractor: knowledgeExtractor(statementInference: inference),
                 store: try await SQLiteKnowledgeStore(database: database)
             )

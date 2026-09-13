@@ -1,6 +1,17 @@
 import CoreServices
 import Foundation
 
+enum ObservationStartupFailure: Error {
+    case creationFailed
+    case registrationFailed
+}
+
+struct NativeFileSystemEventBatch: Sendable {
+    let paths: [String]
+    let flags: [UInt32]
+    let eventIDs: [UInt64]
+}
+
 enum FileSystemEventStream {
     static func watchedPath(for workspaceURL: URL) -> String {
         workspaceURL.path(percentEncoded: false)
@@ -14,9 +25,13 @@ enum FileSystemEventStream {
     static func start(
         at workspaceURL: URL,
         resumingFrom checkpoint: UInt64?,
-        delivering observer: FileSystemEventObserver
-    ) -> FSEventStreamRef? {
-        let delivery = Unmanaged.passRetained(EventDelivery(observer: observer)).toOpaque()
+        observationID: UUID,
+        delivering observer: FileSystemEventObserver,
+        register: (FSEventStreamRef) -> Bool = FSEventStreamStart
+    ) throws -> FSEventStreamRef {
+        let delivery = Unmanaged.passRetained(
+            EventDelivery(observer: observer, observationID: observationID)
+        ).toOpaque()
         var context = FSEventStreamContext(
             version: 0,
             info: delivery,
@@ -27,10 +42,14 @@ enum FileSystemEventStream {
 
         let stream = FSEventStreamCreate(
             kCFAllocatorDefault,
-            { _, info, _, paths, _, _ in
+            { _, info, count, paths, flags, eventIDs in
                 let delivery = Unmanaged<EventDelivery>.fromOpaque(info!).takeUnretainedValue()
                 let changedPaths = unsafeBitCast(paths, to: NSArray.self) as? [String] ?? []
-                delivery.deliver(changedPaths)
+                delivery.deliver(
+                    NativeFileSystemEventBatch(
+                        paths: changedPaths,
+                        flags: Array(UnsafeBufferPointer(start: flags, count: count)),
+                        eventIDs: Array(UnsafeBufferPointer(start: eventIDs, count: count))))
             },
             &context,
             [Self.watchedPath(for: workspaceURL)] as CFArray,
@@ -40,11 +59,15 @@ enum FileSystemEventStream {
         )
         guard let stream else {
             Unmanaged<EventDelivery>.fromOpaque(delivery).release()
-            return nil
+            throw ObservationStartupFailure.creationFailed
         }
 
-        FSEventStreamSetDispatchQueue(stream, DispatchQueue.global())
-        FSEventStreamStart(stream)
+        FSEventStreamSetDispatchQueue(stream, DispatchQueue(label: "anchor.workspace-events"))
+        guard register(stream) else {
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            throw ObservationStartupFailure.registrationFailed
+        }
 
         return stream
     }
@@ -61,13 +84,26 @@ enum FileSystemEventStream {
 }
 
 private final class EventDelivery: Sendable {
-    private let observer: FileSystemEventObserver
+    private let continuation: AsyncStream<NativeFileSystemEventBatch>.Continuation
+    private let deliveryTask: Task<Void, Never>
 
-    init(observer: FileSystemEventObserver) {
-        self.observer = observer
+    init(observer: FileSystemEventObserver, observationID: UUID) {
+        let channel = AsyncStream<NativeFileSystemEventBatch>.makeStream()
+        continuation = channel.continuation
+        deliveryTask = Task {
+            for await batch in channel.stream {
+                guard !Task.isCancelled else { return }
+                await observer.receiveEvents(batch, forObservation: observationID)
+            }
+        }
     }
 
-    func deliver(_ paths: [String]) {
-        Task { await observer.receivePaths(paths) }
+    deinit {
+        continuation.finish()
+        deliveryTask.cancel()
+    }
+
+    func deliver(_ batch: NativeFileSystemEventBatch) {
+        continuation.yield(batch)
     }
 }

@@ -47,10 +47,20 @@ private actor RecordingInference: StatementInferring {
 struct InferredKnowledgeExtractorTests {
     private let projectID = ProjectID()
     private let sessionID = SessionID()
+    private let messageID = MessageID()
 
-    private func request(_ text: String) -> KnowledgeExtractionRequest {
+    private func request(
+        _ text: String, followingMessages: [ConversationMessage] = []
+    ) -> KnowledgeExtractionRequest {
         KnowledgeExtractionRequest(
-            text: text,
+            messages: [
+                ConversationMessage(
+                    id: messageID,
+                    sessionID: sessionID,
+                    role: .user,
+                    content: text,
+                    timestamp: Date(timeIntervalSince1970: 900))
+            ] + followingMessages,
             projectID: projectID,
             source: .session(sessionID),
             sourceContentHash: ContentHash.digest(of: Data(text.utf8)),
@@ -58,15 +68,34 @@ struct InferredKnowledgeExtractorTests {
         )
     }
 
+    private func statement(
+        kind: String,
+        summaryText: String,
+        evidenceText: String
+    ) -> InferredStatement {
+        InferredStatement(
+            kind: kind,
+            summaryText: summaryText,
+            supportingMessageIDs: [messageID],
+            evidenceText: evidenceText)
+    }
+
     @Test("what the model reported becomes what the project knows")
     func whatModelReportedBecomesWhatProjectKnows() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "decision", summaryText: "keep the journal local"),
-                InferredStatement(kind: "risk", summaryText: "the journal grows unbounded"),
+                statement(
+                    kind: "decision",
+                    summaryText: "keep the journal local",
+                    evidenceText: "keep the journal local"),
+                statement(
+                    kind: "risk",
+                    summaryText: "the journal grows unbounded",
+                    evidenceText: "the journal grows unbounded"),
             ]))
 
-        let entries = try await extractor.extractEntries(for: request("a conversation"))
+        let entries = try await extractor.extractEntries(
+            for: request("keep the journal local; the journal grows unbounded"))
 
         #expect(entries.map(\.kind) == [.decision, .risk])
         #expect(entries.allSatisfy { $0.source == .session(sessionID) })
@@ -79,7 +108,10 @@ struct InferredKnowledgeExtractorTests {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(
                 ready: .unavailable("Apple Intelligence is off"),
-                statements: [InferredStatement(kind: "decision", summaryText: "never asked")]
+                statements: [
+                    statement(
+                        kind: "decision", summaryText: "never asked", evidenceText: "conversation")
+                ]
             ))
 
         do {
@@ -104,11 +136,15 @@ struct InferredKnowledgeExtractorTests {
     func statementWithNothingToSayIsNotStoredAsKnowledge() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "todo", summaryText: "   "),
-                InferredStatement(kind: "risk", summaryText: "the journal grows unbounded"),
+                statement(kind: "todo", summaryText: "   ", evidenceText: "conversation"),
+                statement(
+                    kind: "risk",
+                    summaryText: "the journal grows unbounded",
+                    evidenceText: "the journal grows unbounded"),
             ]))
 
-        let entries = try await extractor.extractEntries(for: request("a conversation"))
+        let entries = try await extractor.extractEntries(
+            for: request("a conversation where the journal grows unbounded"))
 
         #expect(entries.map(\.kind) == [.risk])
     }
@@ -117,11 +153,18 @@ struct InferredKnowledgeExtractorTests {
     func sameSentenceOfTwoDifferentKindsIsTwoThingsProjectKnows() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "risk", summaryText: "the journal grows unbounded"),
-                InferredStatement(kind: "todo", summaryText: "the journal grows unbounded"),
+                statement(
+                    kind: "risk",
+                    summaryText: "the journal grows unbounded",
+                    evidenceText: "the journal grows unbounded"),
+                statement(
+                    kind: "todo",
+                    summaryText: "the journal grows unbounded",
+                    evidenceText: "the journal grows unbounded"),
             ]))
 
-        let entries = try await extractor.extractEntries(for: request("a conversation"))
+        let entries = try await extractor.extractEntries(
+            for: request("the journal grows unbounded"))
 
         #expect(entries.map(\.kind) == [.risk, .todo])
         #expect(Set(entries.map(\.id)).count == 2)
@@ -130,26 +173,31 @@ struct InferredKnowledgeExtractorTests {
     @Test("the conversation is cut to the budget before it is asked about")
     func conversationIsCutToBudgetBeforeItIsAskedAbout() async throws {
         let inference = RecordingInference()
-        let conversation = String(repeating: "a", count: 5_000)
-
+        let newestMessage = ConversationMessage(
+            id: MessageID(), sessionID: sessionID, role: .user, content: "Keep the journal local",
+            timestamp: Date(timeIntervalSince1970: 901))
         _ = try await InferredKnowledgeExtractor(inference: inference, characterBudget: 1_200)
-            .extractEntries(for: request(conversation))
+            .extractEntries(
+                for: request(
+                    String(repeating: "a", count: 5_000), followingMessages: [newestMessage]))
 
         let asked = try #require(await inference.asked)
 
-        #expect(asked.window.text.count == 1_200)
-        #expect(asked.window.omittedCharacterCount == 3_800)
+        #expect(asked.window.text.count <= 1_200)
+        #expect(asked.window.omittedCharacterCount > 5_000)
+        #expect(asked.evidenceReferences.map(\.evidenceText) == ["Keep the journal local"])
     }
 
     @Test("a kind the domain does not have is not stored as one it does")
     func kindDomainDoesNotHaveIsNotStoredAsOneItDoes() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "epiphany", summaryText: "something"),
-                InferredStatement(kind: "todo", summaryText: "wire the search"),
+                statement(kind: "epiphany", summaryText: "something", evidenceText: "something"),
+                statement(
+                    kind: "todo", summaryText: "wire the search", evidenceText: "wire the search"),
             ]))
 
-        let entries = try await extractor.extractEntries(for: request("a conversation"))
+        let entries = try await extractor.extractEntries(for: request("something; wire the search"))
 
         #expect(entries.map(\.kind) == [.todo])
     }
@@ -158,9 +206,10 @@ struct InferredKnowledgeExtractorTests {
     func sameConversationInferredTwiceGivesSameEntries() async throws {
         let extractor = InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "todo", summaryText: "wire the search")
+                statement(
+                    kind: "todo", summaryText: "wire the search", evidenceText: "wire the search")
             ]))
-        let asked = request("a conversation")
+        let asked = request("wire the search")
 
         let first = try await extractor.extractEntries(for: asked)
         let second = try await extractor.extractEntries(for: asked)
@@ -172,7 +221,8 @@ struct InferredKnowledgeExtractorTests {
     func inferredEntryIsNotMistakenForOneSomebodyMarked() async throws {
         let inferred = try await InferredKnowledgeExtractor(
             inference: StubInference(statements: [
-                InferredStatement(kind: "todo", summaryText: "wire the search")
+                statement(
+                    kind: "todo", summaryText: "wire the search", evidenceText: "wire the search")
             ])
         ).extractEntries(for: request("TODO: wire the search"))
 
@@ -188,10 +238,18 @@ struct InferredKnowledgeExtractorTests {
 struct CompositeKnowledgeExtractorTests {
     private let projectID = ProjectID()
     private let sessionID = SessionID()
+    private let messageID = MessageID()
 
     private func request(_ text: String) -> KnowledgeExtractionRequest {
         KnowledgeExtractionRequest(
-            text: text,
+            messages: [
+                ConversationMessage(
+                    id: messageID,
+                    sessionID: sessionID,
+                    role: .user,
+                    content: text,
+                    timestamp: Date(timeIntervalSince1970: 900))
+            ],
             projectID: projectID,
             source: .session(sessionID),
             sourceContentHash: ContentHash.digest(of: Data(text.utf8)),
@@ -205,9 +263,14 @@ struct CompositeKnowledgeExtractorTests {
             MarkedKnowledgeExtractor(),
             InferredKnowledgeExtractor(
                 inference: StubInference(statements: [
-                    InferredStatement(kind: "risk", summaryText: "the journal grows unbounded")
+                    InferredStatement(
+                        kind: "risk",
+                        summaryText: "the journal grows unbounded",
+                        supportingMessageIDs: [messageID],
+                        evidenceText: "the journal grows unbounded")
                 ])),
-        ]).extractEntries(for: request("TODO: wire the search"))
+        ]).extractEntries(
+            for: request("TODO: wire the search\nthe journal grows unbounded"))
 
         #expect(Set(entries.map(\.kind)) == [.todo, .risk])
     }

@@ -14,3 +14,13 @@ public protocol AgentSessionKnowledgeRecording: Sendable {
         at instant: Date
     ) async throws
 }
+
+public protocol AgentConversationKnowledgeRecording: Sendable {
+    func recordKnowledge(
+        fromMessages messages: [ConversationMessage],
+        forProject projectID: ProjectID,
+        source: KnowledgeEntrySource,
+        sourceContentHash: ContentHash,
+        at instant: Date
+    ) async throws
+}

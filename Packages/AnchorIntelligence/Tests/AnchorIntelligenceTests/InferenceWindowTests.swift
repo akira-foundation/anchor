@@ -9,6 +9,17 @@ struct InferenceWindowTests {
         String(repeating: "a", count: length)
     }
 
+    @Test("the default window leaves capacity for structured generation")
+    func defaultWindowLeavesCapacityForStructuredGeneration() {
+        let conversation = text(ofLength: 4_000)
+
+        let window = InferenceWindow(
+            over: conversation, keeping: InferenceWindow.defaultCharacterBudget)
+
+        #expect(window.text.count == 3_000)
+        #expect(window.omittedCharacterCount == 1_000)
+    }
+
     @Test("a conversation that fits is asked about whole")
     func conversationThatFitsIsAskedAboutWhole() {
         let window = InferenceWindow(over: text(ofLength: 100), keeping: 1_000)
@@ -48,5 +59,25 @@ struct InferenceWindowTests {
 
         #expect(window.text.isEmpty)
         #expect(window.omittedCharacterCount == 50)
+    }
+
+    @Test("prebuilt text is retained without being cut again")
+    func prebuiltTextIsRetainedWithoutBeingCutAgain() {
+        let window = InferenceWindow(
+            text: "<message>authorized suffix</message>",
+            omittedCharacterCount: 42)
+
+        #expect(window.text == "<message>authorized suffix</message>")
+        #expect(window.omittedCharacterCount == 42)
+        #expect(window.wasShortened)
+    }
+
+    @Test("a negative supplied omission count is normalized to zero")
+    func negativeSuppliedOmissionCountIsNormalizedToZero() {
+        let window = InferenceWindow(text: "complete", omittedCharacterCount: -1)
+
+        #expect(window.text == "complete")
+        #expect(window.omittedCharacterCount == 0)
+        #expect(!window.wasShortened)
     }
 }

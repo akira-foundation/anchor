@@ -1,10 +1,15 @@
 import Foundation
 
 public struct InferenceWindow: Sendable, Hashable {
-    public static let defaultCharacterBudget = 4_000
+    public static let defaultCharacterBudget = 3_000
 
     public let text: String
     public let omittedCharacterCount: Int
+
+    public init(text: String, omittedCharacterCount: Int) {
+        self.text = text
+        self.omittedCharacterCount = max(0, omittedCharacterCount)
+    }
 
     public init(over conversation: String, keeping characterBudget: Int) {
         let budget = max(0, characterBudget)

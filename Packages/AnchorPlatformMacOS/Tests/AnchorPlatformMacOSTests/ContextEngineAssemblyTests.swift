@@ -94,7 +94,6 @@ struct ContextEngineAssemblyTests {
 
             try await coordinator.startObserving(
                 workspaceAt: workspace, forProject: observed.projectID)
-            try await Task.sleep(for: .milliseconds(400))
             try Data("plan revised on run \(run)".utf8)
                 .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
             reached.append(await waitForCheckpoint(at: checkpointFile, beyond: reached.last))

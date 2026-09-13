@@ -8,6 +8,7 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
     public let source: KnowledgeEntrySource
     public let sourceContentHash: ContentHash
     public let origin: KnowledgeEntryOrigin
+    public let supportingMessageIDs: [MessageID]
     public let state: KnowledgeEntryState
     public let createdAt: Date
 
@@ -19,6 +20,7 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
         source: KnowledgeEntrySource,
         sourceContentHash: ContentHash,
         origin: KnowledgeEntryOrigin = .classified,
+        supportingMessageIDs: [MessageID] = [],
         state: KnowledgeEntryState = .current,
         createdAt: Date
     ) {
@@ -29,6 +31,7 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
         self.source = source
         self.sourceContentHash = sourceContentHash
         self.origin = origin
+        self.supportingMessageIDs = supportingMessageIDs
         self.state = state
         self.createdAt = createdAt
     }
@@ -41,6 +44,7 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
         case source
         case sourceContentHash
         case origin
+        case supportingMessageIDs
         case state
         case createdAt
     }
@@ -57,6 +61,9 @@ public struct KnowledgeEntry: Sendable, Hashable, Codable, Identifiable {
             sourceContentHash: try container.decode(ContentHash.self, forKey: .sourceContentHash),
             origin: try container.decodeIfPresent(KnowledgeEntryOrigin.self, forKey: .origin)
                 ?? .classified,
+            supportingMessageIDs: try container.decodeIfPresent(
+                [MessageID].self, forKey: .supportingMessageIDs)
+                ?? [],
             state: try container.decode(KnowledgeEntryState.self, forKey: .state),
             createdAt: try container.decode(Date.self, forKey: .createdAt)
         )

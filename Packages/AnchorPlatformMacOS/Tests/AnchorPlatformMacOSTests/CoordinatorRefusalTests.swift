@@ -8,80 +8,46 @@ import Testing
 
 @testable import AnchorPlatformMacOS
 
-private struct RefusingDiscoverer: ArtifactDiscovering {
-    struct Refusal: Error {}
-
-    func discoverArtifacts(forProject projectID: ProjectID) async throws -> [DiscoveredArtifact] {
-        throw Refusal()
-    }
-}
-
-private struct RefusingSynchronizer: ArtifactRevisionSynchronizing {
-    struct Refusal: Error {}
-
-    func synchronizePendingArtifactRevisions() async throws { throw Refusal() }
-}
-
-private struct SlowSynchronizer: ArtifactRevisionSynchronizing {
-    func synchronizePendingArtifactRevisions() async throws {
-        try await Task.sleep(for: .seconds(2))
-    }
-}
-
 @Suite("What a coordinator remembers about what it could not do", .serialized)
 struct CoordinatorRefusalTests {
-    private let projectID = ProjectID()
+    let projectID = ProjectID()
 
-    private func makeCoordinator(
-        discoverer: any ArtifactDiscovering,
-        synchronizer: any ArtifactRevisionSynchronizing,
-        checkpointURL: URL,
-        initialRefusals: [String] = []
-    ) -> WorkspaceObservationCoordinator {
-        let storage = InMemoryStorageProvider()
-        let contentStore = StoredArtifactContentStore(storage: storage)
-        let operationJournal = StoredSyncOperationJournal(storage: storage)
-
-        return WorkspaceObservationCoordinator(
-            device: Device(id: DeviceID(), displayName: "Studio", platform: .macOS),
-            observer: FileSystemEventObserver(silenceWindow: .milliseconds(100)),
-            checkpointStore: ObservationCheckpointStore(fileURL: checkpointURL),
-            operationJournal: operationJournal,
-            recordChange: RecordWorkspaceChangeAction(
-                discoverer: discoverer,
-                contentReader: CompositeArtifactContentReader([WorkspaceFileContentReader()]),
-                revisionRecorder: ArtifactRevisionRecorder(
-                    journal: StoredArtifactRevisionJournal(
-                        storage: storage, contentStore: contentStore),
-                    contentStore: contentStore,
-                    deviceID: DeviceID()
-                ),
-                operationJournal: operationJournal
-            ),
-            synchronizer: synchronizer,
-            presences: DeferredDevicePresenceRegistry(),
-            initialRefusals: initialRefusals
-        )
-    }
-
-    private func checkpointURL() -> URL {
-        FileManager.default.temporaryDirectory
-            .appending(path: "anchor-refusals-\(UUID().uuidString)/checkpoints.json")
-    }
-
-    private func waitForRefusal(from coordinator: WorkspaceObservationCoordinator) async -> [String]
-    {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-
-        while ContinuousClock.now < deadline {
-            let refusals = await coordinator.recordedRefusals
-
-            guard refusals.isEmpty else { return refusals }
-
-            try? await Task.sleep(for: .milliseconds(50))
+    @Test("a stopped startup can be restarted immediately")
+    func stoppedStartupCanRestartImmediately() async throws {
+        let workspace = try WorkspaceFixture.make(["graphify-out/graph.json": "{}"])
+        let coordinator = makeCoordinator(
+            discoverer: CompositeArtifactDiscoverer([]),
+            synchronizer: DeferredArtifactSynchronizer(), checkpointURL: checkpointURL())
+        for _ in 0..<20 {
+            let starting = Task {
+                try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+            }
+            while !(await coordinator.isObserving) { await Task.yield() }
+            await coordinator.stopObserving()
+            try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+            #expect(await coordinator.isObserving)
+            try await starting.value
+            await coordinator.stopObserving()
         }
+    }
 
-        return []
+    @Test("concurrent starts initialize the coordinator only once")
+    func concurrentStartsInitializeOnlyOnce() async throws {
+        let workspace = try WorkspaceFixture.make(["graphify-out/graph.json": "{}"])
+        let coordinator = makeCoordinator(
+            discoverer: CompositeArtifactDiscoverer([]),
+            synchronizer: RefusingSynchronizer(), checkpointURL: checkpointURL())
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<20 {
+                group.addTask {
+                    try await coordinator.startObserving(
+                        workspaceAt: workspace, forProject: projectID)
+                }
+            }
+            try await group.waitForAll()
+        }
+        await coordinator.stopObserving()
+        #expect(await coordinator.recordedRefusalCount == 1)
     }
 
     @Test("a refusal at start-up is remembered rather than swallowed")
@@ -139,7 +105,6 @@ struct CoordinatorRefusalTests {
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         defer { Task { await coordinator.stopObserving() } }
 
-        try await Task.sleep(for: .milliseconds(400))
         try Data("revised".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
 
@@ -163,7 +128,6 @@ struct CoordinatorRefusalTests {
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         defer { Task { await coordinator.stopObserving() } }
 
-        try await Task.sleep(for: .milliseconds(400))
         try Data("revised".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
         _ = await waitForRefusal(from: coordinator)
@@ -190,7 +154,6 @@ struct CoordinatorRefusalTests {
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         defer { Task { await coordinator.stopObserving() } }
 
-        try await Task.sleep(for: .milliseconds(400))
         try Data("revised".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
 
@@ -211,27 +174,33 @@ struct CoordinatorRefusalTests {
     func changeMadeWhileEngineIsStillStartingUpIsNotLost() async throws {
         let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "plan"])
         let checkpoints = checkpointURL()
-        defer { try? FileManager.default.removeItem(at: checkpoints.deletingLastPathComponent()) }
+        defer {
+            try? FileManager.default.removeItem(at: workspace)
+            try? FileManager.default.removeItem(at: checkpoints.deletingLastPathComponent())
+        }
 
+        let observer = FileSystemEventObserver.checkpointTestObserver()
+        let synchronizer = SuspendedStartupSynchronizer()
+        var startup = synchronizer.started.makeAsyncIterator()
         let coordinator = makeCoordinator(
             discoverer: RefusingDiscoverer(),
-            synchronizer: SlowSynchronizer(),
-            checkpointURL: checkpoints
+            synchronizer: synchronizer,
+            checkpointURL: checkpoints, observer: observer
         )
 
         async let starting: Void = coordinator.startObserving(
             workspaceAt: workspace, forProject: projectID)
 
-        try await Task.sleep(for: .milliseconds(400))
-        try Data("revised while starting".utf8)
-            .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
-
-        try await starting
-        defer { Task { await coordinator.stopObserving() } }
+        #expect(await startup.next() == true)
+        let planURL = workspace.appending(path: "docs/superpowers/plans/00-indice.md")
+        try Data("revised while starting".utf8).write(to: planURL)
+        await observer.deliverCheckpointTestChange(at: planURL, checkpoint: 100)
 
         let refusals = await waitForRefusal(from: coordinator)
-
         #expect(refusals.contains { $0.hasPrefix("recording the change:") })
+        await synchronizer.finishStartup()
+        try await starting
+        await coordinator.stopObserving()
     }
 
     @Test("the number of refusals is counted even once the oldest are forgotten")

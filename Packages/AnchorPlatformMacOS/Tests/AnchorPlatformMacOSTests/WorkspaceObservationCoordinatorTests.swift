@@ -3,6 +3,7 @@ import AnchorDomain
 import AnchorProvider
 import AnchorStorage
 import AnchorSync
+import CoreServices
 import Foundation
 import Testing
 
@@ -10,74 +11,7 @@ import Testing
 
 @Suite("Workspace observation coordinator", .serialized)
 struct WorkspaceObservationCoordinatorTests {
-    private let projectID = ProjectID()
-
-    private func makeCoordinator(
-        device: Device,
-        storage: InMemoryStorageProvider,
-        checkpointStore: ObservationCheckpointStore,
-        workspaceURL: URL,
-        remote: InMemoryStorageProvider = InMemoryStorageProvider()
-    ) -> (WorkspaceObservationCoordinator, StoredSyncOperationJournal) {
-        let operationJournal = StoredSyncOperationJournal(storage: storage)
-        let coordinator = WorkspaceObservationCoordinator(
-            device: device,
-            observer: FileSystemEventObserver(silenceWindow: .milliseconds(200)),
-            checkpointStore: checkpointStore,
-            operationJournal: operationJournal,
-            recordChange: RecordWorkspaceChangeAction(
-                discoverer: CompositeArtifactDiscoverer([
-                    SuperpowersArtifactProvider(workspaceURL: workspaceURL),
-                    GraphifyArtifactProvider(workspaceURL: workspaceURL),
-                    ClaudeSessionProvider(workspaceURL: workspaceURL),
-                    CodexSessionProvider(workspaceURL: workspaceURL),
-                ]),
-                contentReader: CompositeArtifactContentReader([
-                    WorkspaceFileContentReader(),
-                    ClaudeSessionContentReader(projectID: projectID),
-                    CodexSessionContentReader(projectID: projectID),
-                ]),
-                revisionRecorder: ArtifactRevisionRecorder(
-                    journal: StoredArtifactRevisionJournal(
-                        storage: storage, contentStore: StoredArtifactContentStore(storage: storage)
-                    ),
-                    contentStore: StoredArtifactContentStore(storage: storage),
-                    deviceID: device.id
-                ),
-                operationJournal: operationJournal
-            ),
-            synchronizer: makeSynchronizer(
-                storage: storage, remote: remote, operations: operationJournal),
-            presences: StoredDevicePresenceRegistry(storage: remote),
-            now: { Date(timeIntervalSince1970: 1_000) }
-        )
-
-        return (coordinator, operationJournal)
-    }
-
-    private func makeSynchronizer(
-        storage: InMemoryStorageProvider,
-        remote: InMemoryStorageProvider,
-        operations: StoredSyncOperationJournal
-    ) -> ArtifactSynchronizer {
-        ArtifactSynchronizer(
-            local: makeRevisionStore(over: storage),
-            remote: makeRevisionStore(over: remote),
-            operations: operations,
-            failures: StorageFailureClassifier(),
-            feed: StoredRevisionFeed(storage: remote),
-            cursors: StoredSyncCursorStore(storage: storage),
-            divergences: StoredArtifactDivergenceJournal(storage: storage)
-        )
-    }
-
-    private func makeRevisionStore(over storage: InMemoryStorageProvider) -> RevisionStore {
-        RevisionStore(
-            journal: StoredArtifactRevisionJournal(
-                storage: storage, contentStore: StoredArtifactContentStore(storage: storage)),
-            contents: StoredArtifactContentStore(storage: storage)
-        )
-    }
+    let projectID = ProjectID()
 
     @Test("starting recovers an operation the last run left uploading")
     func startingRecoversAnOperationTheLastRunLeftUploading() async throws {
@@ -105,6 +39,60 @@ struct WorkspaceObservationCoordinatorTests {
         await coordinator.stopObserving()
 
         #expect(try await journal.history(of: interrupted.id).map(\.state).contains(.pending))
+    }
+
+    @Test("an incomplete recovery clears observation state and permits restart")
+    func incompleteRecoveryClearsStateAndPermitsRestart() async throws {
+        let workspace = try WorkspaceFixture.make([
+            "graphify-out/graph.json": "before", "graphify-out/unreadable.json": "secret",
+        ])
+        let unreadablePath = workspace.appending(path: "graphify-out/unreadable.json").path
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: unreadablePath)
+            try? FileManager.default.removeItem(at: workspace)
+        }
+        let observer = FileSystemEventObserver(
+            silenceWindow: .zero, captureSnapshot: WorkspaceFileSnapshot.capture,
+            currentEventID: { 100 },
+            registerStream: { stream in
+                let registered = FSEventStreamStart(stream)
+                if registered { FSEventStreamStop(stream) }
+                return registered
+            })
+        let remote = InMemoryStorageProvider()
+        let (coordinator, _) = makeCoordinator(
+            device: Device(id: DeviceID(), displayName: "Studio", platform: .macOS),
+            storage: InMemoryStorageProvider(),
+            checkpointStore: ObservationCheckpointStore(fileURL: makeCheckpointURL()),
+            workspaceURL: workspace, remote: remote, observer: observer,
+            discoverer: GraphifyArtifactProvider(workspaceURL: workspace))
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: unreadablePath)
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.path], flags: [UInt32(kFSEventStreamEventFlagUserDropped)],
+                eventIDs: [100]))
+
+        let deadline = ContinuousClock.now.advanced(by: .seconds(1))
+        while await coordinator.isObserving, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await coordinator.isObserving == false)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: unreadablePath)
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        try Data("after restart".utf8).write(
+            to: workspace.appending(path: "graphify-out/graph.json"))
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/graph.json").path], flags: [0],
+                eventIDs: [200]))
+        let published = await publishedRevisionCount(in: remote, reaching: 1, within: .seconds(1))
+        #expect(await coordinator.recordedRefusals == [])
+        #expect(await coordinator.isObserving)
+        await coordinator.stopObserving()
+        #expect(published == 1)
     }
 
     @Test("starting announces this machine on the project")
@@ -170,7 +158,6 @@ struct WorkspaceObservationCoordinatorTests {
         )
 
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
-        try await Task.sleep(for: .milliseconds(400))
         try Data("after".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
         let published = await publishedRevisionCount(
@@ -179,26 +166,6 @@ struct WorkspaceObservationCoordinatorTests {
 
         #expect(published == 1)
         #expect(try checkpointStore.checkpoint(forWorkspaceAt: workspace) != nil)
-    }
-
-    private func publishedRevisionCount(
-        in remote: InMemoryStorageProvider,
-        reaching target: Int,
-        within limit: Duration
-    ) async -> Int {
-        let feed = StoredRevisionFeed(storage: remote)
-        let deadline = ContinuousClock.now.advanced(by: limit)
-        var seen = 0
-
-        while ContinuousClock.now < deadline {
-            seen = (try? await feed.revisions(after: nil).revisions.count) ?? 0
-
-            guard seen < target else { return seen }
-
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-
-        return seen
     }
 
     @Test("stopping a coordinator that never started is not a failure")
@@ -245,8 +212,4 @@ struct WorkspaceObservationCoordinatorTests {
         #expect(await coordinator.isObserving == false)
     }
 
-    private func makeCheckpointURL() -> URL {
-        FileManager.default.temporaryDirectory
-            .appending(path: "anchor-coordinator-\(UUID().uuidString)/checkpoints.json")
-    }
 }

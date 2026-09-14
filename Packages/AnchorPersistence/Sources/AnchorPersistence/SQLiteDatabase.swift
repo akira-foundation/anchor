@@ -9,7 +9,9 @@ public actor SQLiteDatabase {
 
     private let handle: SQLiteHandle
 
-    public init(fileURL: URL?) throws(Failure) {
+    public init(
+        fileURL: URL?, statementObserver: (any SQLiteStatementObserving)? = nil
+    ) throws(Failure) {
         var opened: OpaquePointer?
         let location = fileURL?.path(percentEncoded: false) ?? ":memory:"
 
@@ -24,6 +26,9 @@ public actor SQLiteDatabase {
 
         handle = SQLiteHandle(opened)
         try Self.configureFileDatabase(opened, fileURL: fileURL)
+        if let statementObserver {
+            try SQLiteStatementTrace.install(statementObserver, on: opened)
+        }
     }
 
     public func execute(_ statements: String) throws(Failure) {

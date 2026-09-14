@@ -14,23 +14,29 @@ struct SQLiteContextSearchTests {
         try await SQLiteContextSearch(database: try SQLiteDatabase(fileURL: nil))
     }
 
-    private func message(_ text: String, role: ConversationRole = .user) -> ConversationEntry {
+    private func message(
+        _ text: String, id: MessageID = MessageID(), role: ConversationRole = .user
+    ) -> ConversationEntry {
         .message(
             ConversationMessage(
-                id: MessageID(), sessionID: sessionID, role: role, content: text,
+                id: id, sessionID: sessionID, role: role, content: text,
                 timestamp: Date(timeIntervalSince1970: 100)
             )
         )
     }
 
     private func activity(
-        tool: String, invocation: String, outcome: String?
+        id: ToolActivityID = ToolActivityID(),
+        tool: String,
+        invocation: String,
+        outcome: String?,
+        timestamp: TimeInterval = 200
     ) -> ConversationEntry {
         .toolActivity(
             ToolActivity(
-                id: ToolActivityID(), sessionID: sessionID, toolName: tool,
+                id: id, sessionID: sessionID, toolName: tool,
                 invocation: invocation, outcome: outcome, failed: false,
-                timestamp: Date(timeIntervalSince1970: 200)
+                timestamp: Date(timeIntervalSince1970: timestamp)
             )
         )
     }
@@ -148,5 +154,75 @@ struct SQLiteContextSearchTests {
 
         #expect(try await search.findContext(matching: "hunter2secret", limit: 10).isEmpty)
         #expect(try await search.findContext(matching: "redacted", limit: 10).count == 1)
+    }
+
+    @Test("reindexing replaces tool invocation and outcome search text")
+    func reindexingReplacesToolActivitySearchText() async throws {
+        let search = try await makeSearch()
+        try await search.indexTranscript(
+            transcript([
+                activity(
+                    tool: "Bash", invocation: "obsolete-tool-command",
+                    outcome: "obsolete-tool-output")
+            ]))
+
+        try await search.indexTranscript(
+            transcript([
+                activity(
+                    tool: "Shell", invocation: "replacement-tool-command",
+                    outcome: "replacement-tool-output", timestamp: 400.123456)
+            ]))
+
+        let replacementHit = try #require(
+            await search.findContext(matching: "replacement-tool-command", limit: 10).first)
+        #expect(try await search.findContext(matching: "obsolete-tool-command", limit: 10).isEmpty)
+        #expect(try await search.findContext(matching: "obsolete-tool-output", limit: 10).isEmpty)
+        #expect(replacementHit.kind == .toolActivity("Shell"))
+        #expect(abs(replacementHit.timestamp.timeIntervalSince1970 - 400.123456) < 0.000001)
+        #expect(
+            try await search.findContext(matching: "replacement-tool-output", limit: 10).count == 1)
+    }
+
+    @Test("a failed reindex restores tool activity search rows")
+    func failedReindexRestoresToolActivitySearchRows() async throws {
+        let search = try await makeSearch()
+        let blockingEntryID = MessageID()
+        let blockingSessionID = SessionID()
+        let blockingSession = AgentSession(
+            id: blockingSessionID, projectID: projectID, provider: .claude,
+            startedAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 300))
+        let blockingEntry = ConversationEntry.message(
+            ConversationMessage(
+                id: blockingEntryID, sessionID: blockingSessionID, role: .user,
+                content: "blocking-message-token", timestamp: Date(timeIntervalSince1970: 100)))
+        let collidingActivityID = ToolActivityID(rawValue: blockingEntryID.rawValue)!
+
+        try await search.indexTranscript(
+            transcript([
+                activity(
+                    tool: "Bash", invocation: "durable-tool-command",
+                    outcome: "durable-tool-output")
+            ]))
+        try await search.indexTranscript(
+            AgentTranscript(session: blockingSession, entries: [blockingEntry]))
+
+        await #expect(throws: SQLiteDatabase.Failure.self) {
+            try await search.indexTranscript(
+                transcript([
+                    activity(
+                        tool: "Shell", invocation: "partial-tool-command",
+                        outcome: "partial-tool-output"),
+                    activity(
+                        id: collidingActivityID, tool: "Shell",
+                        invocation: "collision-tool-command", outcome: nil),
+                ]))
+        }
+
+        #expect(
+            try await search.findContext(matching: "durable-tool-command", limit: 10).count == 1)
+        #expect(try await search.findContext(matching: "durable-tool-output", limit: 10).count == 1)
+        #expect(try await search.findContext(matching: "partial-tool-command", limit: 10).isEmpty)
+        #expect(try await search.findContext(matching: "collision-tool-command", limit: 10).isEmpty)
     }
 }

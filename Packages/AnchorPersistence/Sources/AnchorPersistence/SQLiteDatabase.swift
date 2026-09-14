@@ -23,11 +23,26 @@ public actor SQLiteDatabase {
         }
 
         handle = SQLiteHandle(opened)
+        try Self.configureFileDatabase(opened, fileURL: fileURL)
     }
 
     public func execute(_ statements: String) throws(Failure) {
         guard sqlite3_exec(handle.pointer, statements, nil, nil, nil) == SQLITE_OK else {
             throw .statementRefused(lastMessage())
+        }
+    }
+
+    public func withinTransaction<Output: Sendable>(
+        _ operation: @Sendable (isolated SQLiteDatabase) throws -> Output
+    ) throws -> Output {
+        do {
+            try execute("BEGIN IMMEDIATE;")
+            let output = try operation(self)
+            try execute("COMMIT;")
+            return output
+        } catch {
+            try? execute("ROLLBACK;")
+            throw error
         }
     }
 
@@ -65,6 +80,22 @@ public actor SQLiteDatabase {
         }
 
         return prepared
+    }
+
+    private static func configureFileDatabase(
+        _ handle: OpaquePointer, fileURL: URL?
+    ) throws(Failure) {
+        guard fileURL != nil else { return }
+        guard sqlite3_busy_timeout(handle, 5_000) == SQLITE_OK else {
+            throw .statementRefused(String(cString: sqlite3_errmsg(handle)))
+        }
+        guard
+            sqlite3_exec(
+                handle, "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;", nil, nil, nil
+            ) == SQLITE_OK
+        else {
+            throw .statementRefused(String(cString: sqlite3_errmsg(handle)))
+        }
     }
 
     private static func bind(_ value: SQLiteValue, at index: Int32, to statement: OpaquePointer) {

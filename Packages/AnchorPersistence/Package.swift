@@ -10,13 +10,15 @@ let package = Package(
         .library(name: "AnchorPersistenceTestSupport", targets: ["AnchorPersistenceTestSupport"]),
     ],
     dependencies: [
-        .package(path: "../AnchorDomain")
+        .package(path: "../AnchorDomain"),
+        .package(path: "../AnchorApplication"),
     ],
     targets: [
         .target(
             name: "AnchorPersistence",
             dependencies: [
-                .product(name: "AnchorDomain", package: "AnchorDomain")
+                .product(name: "AnchorDomain", package: "AnchorDomain"),
+                .product(name: "AnchorApplication", package: "AnchorApplication"),
             ]
         ),
         .target(
@@ -28,7 +30,11 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorPersistenceTests",
-            dependencies: ["AnchorPersistence", "AnchorPersistenceTestSupport"]
+            dependencies: [
+                "AnchorPersistence",
+                "AnchorPersistenceTestSupport",
+                .product(name: "AnchorApplication", package: "AnchorApplication"),
+            ]
         ),
     ]
 )

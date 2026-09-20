@@ -94,6 +94,7 @@ struct RecordWorkspaceChangeActionTests {
         for entry in recorded {
             let latest = try await journal.latestRevision(forArtifact: entry.artifact.id)
 
+            #expect(latest == entry.revision)
             #expect(latest?.id == entry.revisionID)
             #expect(latest?.contentHash == entry.contentHash)
         }

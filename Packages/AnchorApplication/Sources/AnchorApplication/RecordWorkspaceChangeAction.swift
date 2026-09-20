@@ -16,13 +16,14 @@ public struct RecordWorkspaceChangeRequest: Sendable, Equatable {
 
 public struct RecordedArtifactRevision: Sendable, Equatable {
     public let artifact: Artifact
-    public let revisionID: RevisionID
-    public let contentHash: ContentHash
+    public let revision: ArtifactRevision
 
-    public init(artifact: Artifact, revisionID: RevisionID, contentHash: ContentHash) {
+    public var revisionID: RevisionID { revision.id }
+    public var contentHash: ContentHash { revision.contentHash }
+
+    public init(artifact: Artifact, revision: ArtifactRevision) {
         self.artifact = artifact
-        self.revisionID = revisionID
-        self.contentHash = contentHash
+        self.revision = revision
     }
 }
 
@@ -74,8 +75,7 @@ public struct RecordWorkspaceChangeAction: Action {
             recorded.append(
                 RecordedArtifactRevision(
                     artifact: discovered.artifact,
-                    revisionID: revision.id,
-                    contentHash: revision.contentHash
+                    revision: revision
                 ))
         }
 

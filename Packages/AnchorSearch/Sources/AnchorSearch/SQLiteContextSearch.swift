@@ -3,12 +3,17 @@ import AnchorDomain
 import AnchorPersistence
 import Foundation
 
-public struct SQLiteContextSearch: ContextSearching, AgentTranscriptIndexing, SessionContextReading
+public struct SQLiteContextSearch: ContextSearching, AgentTranscriptIndexing, SessionContextReading,
+    ProjectContextSearching, ProjectTranscriptsReplacing, ProjectConversationReading
 {
     private static let excerptTokenCount = 12
     private static let fullTextMicrosecondMigrationID = "fts-recorded-at-unix-microseconds-v1"
 
     let database: SQLiteDatabase
+
+    public init(existingDatabase: SQLiteDatabase) {
+        database = existingDatabase
+    }
 
     public init(database: SQLiteDatabase) async throws {
         self.database = database
@@ -75,7 +80,7 @@ public struct SQLiteContextSearch: ContextSearching, AgentTranscriptIndexing, Se
             (messages + activities).sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
-    private static func replaceTranscript(
+    static func replaceTranscript(
         _ transcript: AgentTranscript, in database: isolated SQLiteDatabase
     ) throws {
         let session = transcript.session

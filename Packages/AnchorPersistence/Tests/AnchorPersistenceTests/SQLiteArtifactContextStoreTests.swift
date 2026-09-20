@@ -125,7 +125,7 @@ struct SQLiteArtifactContextStoreTests {
         #expect(firstPage.records.map(\.artifact.id) == [firstClaudeArtifact.id])
         #expect(secondPage.records.map(\.artifact.id) == [secondClaudeArtifact.id])
         #expect(secondPage.nextCursor == nil)
-        await #expect(throws: ArtifactContextCursorFailure.self) {
+        await #expect(throws: ContextCursorFailure.self) {
             try await store.listArtifacts(
                 forProject: secondProjectID,
                 provider: .claude,

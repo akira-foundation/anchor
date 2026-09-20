@@ -1,11 +1,8 @@
 import AnchorApplication
 import Foundation
 
-public enum ContextCursorFailure: Error, Sendable, Equatable {
-    case invalid
-}
-
 enum SQLiteContextCursorOperation: String, Sendable {
+    case searchProject = "search-project"
     case listSessions = "list-sessions"
     case loadConversationEntries = "load-conversation-entries"
 }

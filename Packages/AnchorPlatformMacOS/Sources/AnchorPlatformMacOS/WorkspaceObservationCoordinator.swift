@@ -14,6 +14,8 @@ public actor WorkspaceObservationCoordinator {
     private let synchronizer: any ArtifactRevisionSynchronizing
     private let presences: any DevicePresenceRegistry
     private let sessionContext: SessionContextRecording?
+    private let artifactIndex: (any ArtifactContextIndexing)?
+    private let contextStatus: ContextReadModelStatusStore?
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var activeObservationID: UUID?
@@ -32,6 +34,8 @@ public actor WorkspaceObservationCoordinator {
         synchronizer: any ArtifactRevisionSynchronizing,
         presences: any DevicePresenceRegistry,
         sessionContext: SessionContextRecording? = nil,
+        artifactIndex: (any ArtifactContextIndexing)? = nil,
+        contextStatus: ContextReadModelStatusStore? = nil,
         initialRefusals: [String] = [],
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -43,6 +47,8 @@ public actor WorkspaceObservationCoordinator {
         self.synchronizer = synchronizer
         self.presences = presences
         self.sessionContext = sessionContext
+        self.artifactIndex = artifactIndex
+        self.contextStatus = contextStatus
         refusals = Array(initialRefusals.suffix(Self.rememberedRefusalCount))
         refusalCount = initialRefusals.count
         self.now = now
@@ -145,6 +151,14 @@ public actor WorkspaceObservationCoordinator {
     ) async -> Bool {
         guard activeObservationID == observationID, !Task.isCancelled else { return false }
         let change = announcement.change
+        var contextUpdate: ContextReadModelStatusStore.Update?
+        guard
+            await recording(
+                "marking context unavailable",
+                {
+                    contextUpdate = try await contextStatus?.beginUpdate()
+                })
+        else { return false }
         var outcome: RecordWorkspaceChangeOutcome = .deviceCannotDiscover
         let recorded = await recording("recording the change") {
             outcome = try await recordChange.perform(
@@ -154,13 +168,24 @@ public actor WorkspaceObservationCoordinator {
 
         guard recorded, case .recorded(let revisions) = outcome,
             activeObservationID == observationID, !Task.isCancelled
-        else { return false }
+        else {
+            await completeContextUpdate(contextUpdate, succeeded: false)
+            return false
+        }
+        let artifactsIndexed = await recording("indexing artifact context") {
+            try await artifactIndex?.indexArtifactRevisions(revisions)
+        }
         let contextRefusals =
             await sessionContext?.recordSessionContext(in: revisions, at: now()) ?? []
-        guard activeObservationID == observationID, !Task.isCancelled else { return false }
+        guard activeObservationID == observationID, !Task.isCancelled else {
+            await completeContextUpdate(contextUpdate, succeeded: false)
+            return false
+        }
         for refusal in contextRefusals {
             remember("indexing \(refusal.artifactName)", refusal.description)
         }
+        await completeContextUpdate(
+            contextUpdate, succeeded: artifactsIndexed && contextRefusals.isEmpty)
 
         await recording("recording the checkpoint") {
             try checkpointStore.recordCheckpoint(
@@ -178,6 +203,15 @@ public actor WorkspaceObservationCoordinator {
         refusalCount += 1
         refusals.append("\(attempt): \(description)")
         refusals = refusals.suffix(Self.rememberedRefusalCount)
+    }
+
+    private func completeContextUpdate(
+        _ update: ContextReadModelStatusStore.Update?, succeeded: Bool
+    ) async {
+        guard let update else { return }
+        await recording("updating context availability") {
+            try await contextStatus?.completeUpdate(update, succeeded: succeeded)
+        }
     }
 
     @discardableResult

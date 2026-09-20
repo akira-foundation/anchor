@@ -1,6 +1,7 @@
 import AnchorDomain
 import AnchorIntelligence
 import AnchorKnowledge
+import AnchorPersistence
 import AnchorStorage
 import CryptoKit
 import Foundation
@@ -189,7 +190,8 @@ struct AssembledKnowledgeExtractorTests {
         let context = try await ContextEngineAssembly.makeSessionContext(
             storage: await assembleStorage(),
             inferringKnowledge: true,
-            statementInference: inference
+            statementInference: inference,
+            database: SQLiteDatabase(fileURL: nil)
         )
         let transcript = AgentTranscript(
             session: AgentSession(
@@ -214,7 +216,7 @@ struct AssembledKnowledgeExtractorTests {
     @Test("inference is reported as disabled when the workspace did not ask for it")
     func inferenceIsReportedAsDisabledWhenWorkspaceDidNotAskForIt() async throws {
         let context = try await ContextEngineAssembly.makeSessionContext(
-            storage: await assembleStorage())
+            storage: await assembleStorage(), database: SQLiteDatabase(fileURL: nil))
 
         #expect(await context.inferenceStatus() == .disabled)
     }
@@ -224,7 +226,8 @@ struct AssembledKnowledgeExtractorTests {
         let context = try await ContextEngineAssembly.makeSessionContext(
             storage: await assembleStorage(),
             inferringKnowledge: true,
-            statementInference: UnavailableStatementInference()
+            statementInference: UnavailableStatementInference(),
+            database: SQLiteDatabase(fileURL: nil)
         )
 
         #expect(await context.inferenceStatus() == .unavailable("Apple Intelligence is off"))
@@ -236,7 +239,8 @@ struct AssembledKnowledgeExtractorTests {
         let context = try await ContextEngineAssembly.makeSessionContext(
             storage: await assembleStorage(),
             inferringKnowledge: true,
-            statementInference: inference
+            statementInference: inference,
+            database: SQLiteDatabase(fileURL: nil)
         )
 
         #expect(await context.inferenceStatus() == .unavailable("model is preparing"))

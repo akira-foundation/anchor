@@ -6,15 +6,21 @@ import Testing
 final class SQLiteOwnershipReadReassignment: SQLiteStatementObserving {
     private let databaseFileURL: URL
     private let statements: String
+    private let observedStatementPrefix: String
     private let attempts = AsyncStream<Int32>.makeStream(bufferingPolicy: .bufferingNewest(1))
 
-    init(databaseFileURL: URL, statements: String) {
+    init(
+        databaseFileURL: URL, statements: String,
+        observedStatementPrefix: String =
+            "SELECT project_id FROM context_sessions WHERE session_id = ? LIMIT 1;"
+    ) {
         self.databaseFileURL = databaseFileURL
         self.statements = statements
+        self.observedStatementPrefix = observedStatementPrefix
     }
 
     func recordCompletion(ofStatement statement: String) {
-        guard statement == "SELECT project_id FROM context_sessions WHERE session_id = ? LIMIT 1;"
+        guard statement.hasPrefix(observedStatementPrefix)
         else { return }
         var writerConnection: OpaquePointer?
         let openedStatus = sqlite3_open(databaseFileURL.path, &writerConnection)

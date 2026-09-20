@@ -8,24 +8,31 @@ public actor SQLiteDatabase {
     }
 
     private let handle: SQLiteHandle
+    private let readOnly: Bool
 
     public init(
-        fileURL: URL?, statementObserver: (any SQLiteStatementObserving)? = nil
+        fileURL: URL?, readOnly: Bool = false,
+        statementObserver: (any SQLiteStatementObserving)? = nil
     ) throws(Failure) {
         var opened: OpaquePointer?
         let location = fileURL?.path(percentEncoded: false) ?? ":memory:"
 
-        fileURL.map {
-            try? FileManager.default.createDirectory(
-                at: $0.deletingLastPathComponent(), withIntermediateDirectories: true)
+        self.readOnly = readOnly
+        if !readOnly {
+            fileURL.map {
+                try? FileManager.default.createDirectory(
+                    at: $0.deletingLastPathComponent(), withIntermediateDirectories: true)
+            }
         }
 
-        guard sqlite3_open(location, &opened) == SQLITE_OK, let opened else {
+        let flags = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+        guard sqlite3_open_v2(location, &opened, flags, nil) == SQLITE_OK, let opened else {
+            if let opened { sqlite3_close(opened) }
             throw .couldNotOpen(location)
         }
 
         handle = SQLiteHandle(opened)
-        try Self.configureFileDatabase(opened, fileURL: fileURL)
+        try Self.configureFileDatabase(opened, fileURL: fileURL, readOnly: readOnly)
         if let statementObserver {
             try SQLiteStatementTrace.install(statementObserver, on: opened)
         }
@@ -41,7 +48,7 @@ public actor SQLiteDatabase {
         _ operation: @Sendable (isolated SQLiteDatabase) throws -> Output
     ) throws -> Output {
         do {
-            try execute("BEGIN IMMEDIATE;")
+            try execute(readOnly ? "BEGIN;" : "BEGIN IMMEDIATE;")
             let output = try operation(self)
             try execute("COMMIT;")
             return output
@@ -88,7 +95,7 @@ public actor SQLiteDatabase {
     }
 
     private static func configureFileDatabase(
-        _ handle: OpaquePointer, fileURL: URL?
+        _ handle: OpaquePointer, fileURL: URL?, readOnly: Bool
     ) throws(Failure) {
         guard fileURL != nil else { return }
         guard sqlite3_busy_timeout(handle, 5_000) == SQLITE_OK else {
@@ -96,7 +103,10 @@ public actor SQLiteDatabase {
         }
         guard
             sqlite3_exec(
-                handle, "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;", nil, nil, nil
+                handle,
+                readOnly
+                    ? "PRAGMA foreign_keys=ON;"
+                    : "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;", nil, nil, nil
             ) == SQLITE_OK
         else {
             throw .statementRefused(String(cString: sqlite3_errmsg(handle)))

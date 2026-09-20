@@ -157,8 +157,8 @@ struct StoredSessionContextRecorderTests {
         #expect(hits.map(\.sessionID) == [goodSessionID])
     }
 
-    @Test("a session whose content is gone is skipped rather than failing the batch")
-    func sessionWhoseContentIsGoneIsSkippedRatherThanFailingBatch() async throws {
+    @Test("a session whose content is gone records an indexing refusal")
+    func sessionWhoseContentIsGoneRecordsAnIndexingRefusal() async throws {
         let database = try SQLiteDatabase(fileURL: nil)
         let recorder = StoredSessionContextRecorder(
             contentStore: StoredArtifactContentStore(storage: InMemoryStorageProvider()),
@@ -184,6 +184,8 @@ struct StoredSessionContextRecorderTests {
             at: recordedAt
         )
 
-        #expect(refusals.isEmpty)
+        #expect(refusals.count == 1)
+        #expect(refusals.first?.artifactName == artifact.name)
+        #expect(refusals.first?.description.contains("entityNotFound") == true)
     }
 }

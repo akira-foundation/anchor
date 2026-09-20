@@ -1,3 +1,4 @@
+import AnchorApplication
 import AnchorDomain
 import AnchorIntelligence
 import AnchorSearch
@@ -5,6 +6,9 @@ import Foundation
 
 public struct AssembledSessionContext: Sendable {
     public let search: any ContextSearching
+    public let sessions: any SessionContextReading
+    public let transcripts: any ProjectTranscriptsReplacing
+    public let artifactIndex: any ArtifactContextIndexing & ArtifactContextReplacing
     public let recorder: any SessionContextRecording
     public let rebuilder: DiscoveredSessionContextRebuilder
     let statementInference: (any StatementInferring)?

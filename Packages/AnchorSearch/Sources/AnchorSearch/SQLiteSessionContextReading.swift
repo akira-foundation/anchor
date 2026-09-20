@@ -4,6 +4,25 @@ import AnchorPersistence
 import Foundation
 
 extension SQLiteContextSearch {
+    private static let sessionSelection = """
+        SELECT session_id, project_id, provider, started_at, updated_at, parent_session_id,
+            (SELECT COUNT(*) FROM context_entries e WHERE e.session_id = context_sessions.session_id
+                AND e.entry_kind = 'message') AS message_count,
+            (SELECT COUNT(*) FROM context_entries e WHERE e.session_id = context_sessions.session_id
+                AND e.entry_kind = 'toolActivity') AS tool_count
+        """
+
+    public func loadConversationEntries(
+        inSession sessionID: SessionID, forProject projectID: ProjectID,
+        page: ContextPageRequest
+    ) async throws -> ContextPage<ConversationEntry> {
+        try await database.withinTransaction { isolatedDatabase in
+            try Self.loadConversationPage(
+                inSession: sessionID, page: page, expectedProjectID: projectID,
+                from: isolatedDatabase)
+        }
+    }
+
     public func listSessions(
         forProject projectID: ProjectID,
         provider: AgentProvider?,
@@ -16,7 +35,7 @@ extension SQLiteContextSearch {
             scopeBinding: projectID.rawValue,
             filterBinding: providerFilter)
         var statement = """
-            SELECT session_id, project_id, provider, started_at, updated_at, parent_session_id
+            \(Self.sessionSelection)
             FROM context_sessions
             WHERE project_id = ?
             """
@@ -37,7 +56,7 @@ extension SQLiteContextSearch {
         parameters.append(.integer(Int64(page.limit + 1)))
 
         let sessionRows = try await database.run(statement, parameters)
-        let sessions = sessionRows.compactMap(Self.sessionRecord)
+        let sessions = try sessionRows.map(Self.sessionRecord)
         let records = Array(sessions.prefix(page.limit))
         let nextCursor =
             try sessionRows.count > page.limit
@@ -52,11 +71,11 @@ extension SQLiteContextSearch {
     ) async throws -> SessionContextRecord? {
         let sessionRows = try await database.run(
             """
-            SELECT session_id, project_id, provider, started_at, updated_at, parent_session_id
+            \(Self.sessionSelection)
             FROM context_sessions WHERE session_id = ? LIMIT 1;
             """,
             [.text(sessionID.rawValue)])
-        return sessionRows.first.flatMap(Self.sessionRecord)
+        return try sessionRows.first.map(Self.sessionRecord)
     }
 
     public func loadConversationEntries(
@@ -72,17 +91,25 @@ extension SQLiteContextSearch {
     private static func loadConversationPage(
         inSession sessionID: SessionID,
         page: ContextPageRequest,
+        expectedProjectID: ProjectID? = nil,
         from database: isolated SQLiteDatabase
     ) throws -> ContextPage<ConversationEntry> {
         let projectRows = try database.run(
             "SELECT project_id FROM context_sessions WHERE session_id = ? LIMIT 1;",
             [.text(sessionID.rawValue)])
+        guard !projectRows.isEmpty else {
+            if expectedProjectID != nil { throw ContextQueryFailure.entityNotFound }
+            guard page.cursor == nil else { throw ContextCursorFailure.invalid }
+            return ContextPage(records: [], nextCursor: nil)
+        }
         guard
             let projectID = projectRows.first?["project_id"]?.text.flatMap(
                 ProjectID.init(rawValue:))
         else {
-            guard page.cursor == nil else { throw ContextCursorFailure.invalid }
-            return ContextPage(records: [], nextCursor: nil)
+            throw SQLiteContextReadFailure.malformedSession
+        }
+        guard expectedProjectID == nil || expectedProjectID == projectID else {
+            throw ContextQueryFailure.entityNotFound
         }
         let cursorPosition = try SQLiteContextCursor.decode(
             page.cursor,
@@ -109,7 +136,7 @@ extension SQLiteContextSearch {
         parameters.append(.integer(Int64(page.limit + 1)))
 
         let entryRows = try database.run(statement, parameters)
-        let entries = entryRows.compactMap(Self.conversationEntry)
+        let entries = try entryRows.map(Self.conversationEntry)
         let records = Array(entries.prefix(page.limit))
         let nextCursor =
             try entryRows.count > page.limit
@@ -124,7 +151,7 @@ extension SQLiteContextSearch {
         projectID: ProjectID,
         provider: AgentProvider?
     ) throws -> ContextPageCursor? {
-        guard let session = record?.session else { return nil }
+        guard let session = record?.session else { throw SQLiteContextReadFailure.malformedEntry }
         return try SQLiteContextCursor.encode(
             operation: .listSessions,
             scopeBinding: projectID.rawValue,
@@ -138,7 +165,7 @@ extension SQLiteContextSearch {
     private static func entryCursor(
         after entry: ConversationEntry?, projectID: ProjectID, sessionID: SessionID
     ) throws -> ContextPageCursor? {
-        guard let entry else { return nil }
+        guard let entry else { throw SQLiteContextReadFailure.malformedEntry }
         return try SQLiteContextCursor.encode(
             operation: .loadConversationEntries,
             scopeBinding: conversationScopeBinding(projectID: projectID, sessionID: sessionID),
@@ -151,18 +178,20 @@ extension SQLiteContextSearch {
 
     private static func sessionRecord(
         from row: [String: SQLiteValue]
-    ) -> SessionContextRecord? {
+    ) throws -> SessionContextRecord {
         guard let sessionID = row["session_id"]?.text.flatMap(SessionID.init(rawValue:)),
             let projectID = row["project_id"]?.text.flatMap(ProjectID.init(rawValue:)),
             let provider = row["provider"]?.text.flatMap(AgentProvider.init(rawValue:)),
             let startedAt = row["started_at"]?.integer,
-            let updatedAt = row["updated_at"]?.integer
-        else { return nil }
+            let updatedAt = row["updated_at"]?.integer,
+            let messageCount = row["message_count"]?.integer, messageCount >= 0,
+            let toolCount = row["tool_count"]?.integer, toolCount >= 0
+        else { throw SQLiteContextReadFailure.malformedSession }
 
         let parentSessionID: SessionID?
         if let parentIdentifier = row["parent_session_id"]?.text {
             guard let parsedParentSessionID = SessionID(rawValue: parentIdentifier) else {
-                return nil
+                throw SQLiteContextReadFailure.malformedSession
             }
             parentSessionID = parsedParentSessionID
         } else {
@@ -174,30 +203,32 @@ extension SQLiteContextSearch {
                 id: sessionID, projectID: projectID, provider: provider,
                 startedAt: SQLiteContextTimestamp.date(fromUnixMicroseconds: startedAt),
                 updatedAt: SQLiteContextTimestamp.date(fromUnixMicroseconds: updatedAt),
-                parentSessionID: parentSessionID))
+                parentSessionID: parentSessionID), messageCount: Int(messageCount),
+            toolActivityCount: Int(toolCount))
     }
 
-    private static func conversationEntry(
+    static func conversationEntry(
         from row: [String: SQLiteValue]
-    ) -> ConversationEntry? {
+    ) throws -> ConversationEntry {
         guard let entryKind = row["entry_kind"]?.text,
             let sessionID = row["session_id"]?.text.flatMap(SessionID.init(rawValue:)),
             let identifier = row["entry_id"]?.text,
             let roleOrTool = row["role_or_tool"]?.text,
             let body = row["body"]?.text,
             let recordedAt = row["recorded_at"]?.integer
-        else { return nil }
+        else { throw SQLiteContextReadFailure.malformedEntry }
         let timestamp = SQLiteContextTimestamp.date(fromUnixMicroseconds: recordedAt)
 
         guard entryKind == "message" else {
-            return toolActivity(
+            guard entryKind == "toolActivity" else { throw SQLiteContextReadFailure.malformedEntry }
+            return try toolActivity(
                 identifier: identifier, sessionID: sessionID, toolName: roleOrTool,
                 invocation: body, outcome: row["outcome"]?.text,
                 failedInteger: row["failed"]?.integer, timestamp: timestamp)
         }
         guard let messageID = MessageID(rawValue: identifier),
             let role = ConversationRole(rawValue: roleOrTool)
-        else { return nil }
+        else { throw SQLiteContextReadFailure.malformedEntry }
         return .message(
             ConversationMessage(
                 id: messageID, sessionID: sessionID, role: role,
@@ -212,11 +243,11 @@ extension SQLiteContextSearch {
         outcome: String?,
         failedInteger: Int64?,
         timestamp: Date
-    ) -> ConversationEntry? {
+    ) throws -> ConversationEntry {
         guard let activityID = ToolActivityID(rawValue: identifier),
             let failedInteger,
             failedInteger == 0 || failedInteger == 1
-        else { return nil }
+        else { throw SQLiteContextReadFailure.malformedEntry }
         return .toolActivity(
             ToolActivity(
                 id: activityID, sessionID: sessionID, toolName: toolName,

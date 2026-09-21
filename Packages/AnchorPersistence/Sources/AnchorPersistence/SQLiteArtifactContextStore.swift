@@ -85,13 +85,15 @@ public struct SQLiteArtifactContextStore:
     public func listArtifacts(
         forProject projectID: ProjectID,
         provider: AgentProvider?,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<ArtifactContextRecord> {
         let providerBinding = provider?.rawValue ?? ""
         let cursorPosition = try ArtifactContextCursor.decode(
             page.cursor,
             projectID: projectID,
-            providerBinding: providerBinding)
+            providerBinding: providerBinding,
+            binding: binding)
         var statement = """
             SELECT artifact_id, project_id, provider, name, revision_id, content_hash, revised_at
             FROM context_artifacts
@@ -122,7 +124,8 @@ public struct SQLiteArtifactContextStore:
             ? ArtifactContextCursor.encode(
                 after: pageRecords.last,
                 projectID: projectID,
-                providerBinding: providerBinding)
+                providerBinding: providerBinding,
+                binding: binding)
             : nil
 
         return ContextPage(records: pageRecords, nextCursor: nextCursor)

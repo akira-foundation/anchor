@@ -31,10 +31,12 @@ public struct SearchProjectContextAction: Action {
     public func perform(
         _ request: SearchProjectContextRequest
     ) async throws -> ContextPage<ProjectContextSearchHit> {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
             return try await search.searchContext(
-                forProject: project.projectID, matching: request.text, page: request.page)
+                forProject: project.projectID, matching: request.text, page: request.page,
+                binding: ContextCursorBinding(
+                    workspaceURL: project.workspaceURL, generation: generation))
         }
     }
 }

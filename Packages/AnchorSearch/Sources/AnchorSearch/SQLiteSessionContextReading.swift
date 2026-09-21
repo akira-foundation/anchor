@@ -14,11 +14,12 @@ extension SQLiteContextSearch {
 
     public func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest
+        page: ContextPageRequest, binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
         try await database.withinTransaction { isolatedDatabase in
             try Self.loadConversationPage(
                 inSession: sessionID, page: page, expectedProjectID: projectID,
+                binding: binding,
                 from: isolatedDatabase)
         }
     }
@@ -26,14 +27,15 @@ extension SQLiteContextSearch {
     public func listSessions(
         forProject projectID: ProjectID,
         provider: AgentProvider?,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<SessionContextRecord> {
         let providerFilter = provider?.rawValue ?? ""
         let cursorPosition = try SQLiteContextCursor.decode(
             page.cursor,
             operation: .listSessions,
             scopeBinding: projectID.rawValue,
-            filterBinding: providerFilter)
+            filterBinding: providerFilter, binding: binding)
         var statement = """
             \(Self.sessionSelection)
             FROM context_sessions
@@ -60,7 +62,9 @@ extension SQLiteContextSearch {
         let records = Array(sessions.prefix(page.limit))
         let nextCursor =
             try sessionRows.count > page.limit
-            ? Self.sessionCursor(after: records.last, projectID: projectID, provider: provider)
+            ? Self.sessionCursor(
+                after: records.last, projectID: projectID, provider: provider,
+                binding: binding)
             : nil
 
         return ContextPage(records: records, nextCursor: nextCursor)
@@ -80,11 +84,12 @@ extension SQLiteContextSearch {
 
     public func loadConversationEntries(
         inSession sessionID: SessionID,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
         try await database.withinTransaction { isolatedDatabase in
             try Self.loadConversationPage(
-                inSession: sessionID, page: page, from: isolatedDatabase)
+                inSession: sessionID, page: page, binding: binding, from: isolatedDatabase)
         }
     }
 
@@ -92,6 +97,7 @@ extension SQLiteContextSearch {
         inSession sessionID: SessionID,
         page: ContextPageRequest,
         expectedProjectID: ProjectID? = nil,
+        binding: ContextCursorBinding,
         from database: isolated SQLiteDatabase
     ) throws -> ContextPage<ConversationEntry> {
         let projectRows = try database.run(
@@ -116,7 +122,7 @@ extension SQLiteContextSearch {
             operation: .loadConversationEntries,
             scopeBinding: Self.conversationScopeBinding(
                 projectID: projectID, sessionID: sessionID),
-            filterBinding: "")
+            filterBinding: "", binding: binding)
         var statement = """
             SELECT entry_id, session_id, entry_kind, role_or_tool, body, outcome,
                    failed, recorded_at, ordering_id
@@ -140,7 +146,9 @@ extension SQLiteContextSearch {
         let records = Array(entries.prefix(page.limit))
         let nextCursor =
             try entryRows.count > page.limit
-            ? Self.entryCursor(after: records.last, projectID: projectID, sessionID: sessionID)
+            ? Self.entryCursor(
+                after: records.last, projectID: projectID, sessionID: sessionID,
+                binding: binding)
             : nil
 
         return ContextPage(records: records, nextCursor: nextCursor)
@@ -149,13 +157,14 @@ extension SQLiteContextSearch {
     private static func sessionCursor(
         after record: SessionContextRecord?,
         projectID: ProjectID,
-        provider: AgentProvider?
+        provider: AgentProvider?, binding: ContextCursorBinding
     ) throws -> ContextPageCursor? {
         guard let session = record?.session else { throw SQLiteContextReadFailure.malformedEntry }
         return try SQLiteContextCursor.encode(
             operation: .listSessions,
             scopeBinding: projectID.rawValue,
             filterBinding: provider?.rawValue ?? "",
+            binding: binding,
             position: SQLiteContextCursorPosition(
                 timestamp: SQLiteContextTimestamp.microseconds(
                     sinceUnixEpochFor: session.updatedAt),
@@ -163,13 +172,15 @@ extension SQLiteContextSearch {
     }
 
     private static func entryCursor(
-        after entry: ConversationEntry?, projectID: ProjectID, sessionID: SessionID
+        after entry: ConversationEntry?, projectID: ProjectID, sessionID: SessionID,
+        binding: ContextCursorBinding
     ) throws -> ContextPageCursor? {
         guard let entry else { throw SQLiteContextReadFailure.malformedEntry }
         return try SQLiteContextCursor.encode(
             operation: .loadConversationEntries,
             scopeBinding: conversationScopeBinding(projectID: projectID, sessionID: sessionID),
             filterBinding: "",
+            binding: binding,
             position: SQLiteContextCursorPosition(
                 timestamp: SQLiteContextTimestamp.microseconds(
                     sinceUnixEpochFor: entry.timestamp),

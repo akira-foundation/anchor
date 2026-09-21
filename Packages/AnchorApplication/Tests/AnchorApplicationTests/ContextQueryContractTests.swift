@@ -18,6 +18,7 @@ struct ContextQueryContractTests {
         #expect(ContextPageCursor(rawValue: "") == nil)
         #expect(ContextPageCursor(rawValue: " next-page") == nil)
         #expect(ContextPageCursor(rawValue: "next-page ") == nil)
+        #expect(ContextPageCursor(rawValue: "next-page")?.rawValue == "next-page")
     }
 
     @Test("artifact context rejects a latest revision from another artifact")
@@ -35,6 +36,23 @@ struct ContextQueryContractTests {
             ))
 
         #expect(ArtifactContextRecord(artifact: artifact, latestRevision: unrelatedRevision) == nil)
+    }
+
+    @Test("artifact context accepts a latest revision from the same artifact")
+    func artifactContextAcceptsMatchingRevision() throws {
+        let artifact = try #require(
+            Artifact(
+                id: ArtifactID(), projectID: ProjectID(), provider: .codex,
+                name: "session.json"
+            ))
+        let revision = try #require(
+            ArtifactRevision(
+                id: RevisionID(), artifactID: artifact.id, parentRevisionID: nil,
+                contentHash: ContentHash.digest(of: Data("context".utf8)),
+                deviceID: DeviceID(), createdAt: Date(timeIntervalSince1970: 0)
+            ))
+
+        #expect(ArtifactContextRecord(artifact: artifact, latestRevision: revision) != nil)
     }
 
     @Test("project context preserves the authorized workspace spelling")

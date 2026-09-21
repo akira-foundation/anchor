@@ -48,7 +48,8 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
             ? ArtifactContextRecord(artifact: artifact, latestRevision: revision) : nil
     }
     func listArtifacts(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ArtifactContextRecord>
     {
@@ -68,7 +69,8 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
             ? SessionContextRecord(session: session, messageCount: 7, toolActivityCount: 3) : nil
     }
     func listSessions(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<SessionContextRecord>
     {
@@ -79,15 +81,18 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
     }
     func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest
+        page: ContextPageRequest, binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
         guard sessionID == session.id, projectID == session.projectID else {
             throw ContextQueryFailure.entityNotFound
         }
-        return try await loadConversationEntries(inSession: sessionID, page: page)
+        return try await loadConversationEntries(
+            inSession: sessionID, page: page,
+            binding: binding)
     }
     func loadConversationEntries(
-        inSession sessionID: SessionID, page: ContextPageRequest
+        inSession sessionID: SessionID, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ConversationEntry>
     {
@@ -109,7 +114,8 @@ actor QuerySearchSpy: ProjectContextSearching {
     var requestedProject: ProjectID?
     init(failure: Failure? = nil) { self.failure = failure }
     func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest
+        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ProjectContextSearchHit>
     {

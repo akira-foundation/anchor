@@ -3,17 +3,21 @@ import AnchorDomain
 import Foundation
 
 enum ArtifactContextCursor {
-    private static let version = 1
+    private static let version = 2
 
     static func encode(
         after record: ArtifactContextRecord?,
         projectID: ProjectID,
-        providerBinding: String
+        providerBinding: String,
+        binding: ContextCursorBinding
     ) throws -> ContextPageCursor? {
         guard let record, let revision = record.latestRevision else { return nil }
 
         let payload = Payload(
             version: version,
+            operation: "list-artifacts",
+            workspacePath: binding.workspacePath,
+            generation: binding.generation.identifier,
             projectID: projectID.rawValue,
             providerBinding: providerBinding,
             revisedAt: SQLiteArtifactContextStore.revisedAt(for: revision.createdAt),
@@ -33,7 +37,8 @@ enum ArtifactContextCursor {
     static func decode(
         _ cursor: ContextPageCursor?,
         projectID: ProjectID,
-        providerBinding: String
+        providerBinding: String,
+        binding: ContextCursorBinding
     ) throws -> Position? {
         guard let cursor else { return nil }
         guard cursor.rawValue.allSatisfy(Self.isURLSafeBase64Character) else {
@@ -48,6 +53,9 @@ enum ArtifactContextCursor {
         guard let payloadBytes = Data(base64Encoded: encodedPayload),
             let payload = try? JSONDecoder().decode(Payload.self, from: payloadBytes),
             payload.version == version,
+            payload.operation == "list-artifacts",
+            payload.workspacePath == binding.workspacePath,
+            payload.generation == binding.generation.identifier,
             payload.projectID == projectID.rawValue,
             payload.providerBinding == providerBinding,
             !payload.artifactID.isEmpty
@@ -68,6 +76,9 @@ enum ArtifactContextCursor {
 
     private struct Payload: Codable {
         let version: Int
+        let operation: String
+        let workspacePath: String
+        let generation: UUID
         let projectID: String
         let providerBinding: String
         let revisedAt: Int64

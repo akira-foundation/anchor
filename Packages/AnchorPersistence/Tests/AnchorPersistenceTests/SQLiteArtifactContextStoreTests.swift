@@ -125,6 +125,29 @@ struct SQLiteArtifactContextStoreTests {
         #expect(firstPage.records.map(\.artifact.id) == [firstClaudeArtifact.id])
         #expect(secondPage.records.map(\.artifact.id) == [secondClaudeArtifact.id])
         #expect(secondPage.nextCursor == nil)
+        let legacyPayload = """
+            {"version":1,"projectID":"\(firstProjectID.rawValue)","providerBinding":"claude","revisedAt":300000000,"artifactID":"\(firstClaudeArtifact.id.rawValue)"}
+            """
+        let legacyToken = Data(legacyPayload.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        await #expect(throws: ContextCursorFailure.invalid) {
+            try await store.listArtifacts(
+                forProject: firstProjectID, provider: .claude,
+                page: makePage(limit: 1, cursor: ContextPageCursor(rawValue: legacyToken)))
+        }
+        for mismatchedBinding in [
+            siblingWorkspaceCursorBinding,
+            expiredGenerationCursorBinding,
+        ] {
+            await #expect(throws: ContextCursorFailure.invalid) {
+                try await store.listArtifacts(
+                    forProject: firstProjectID, provider: .claude,
+                    page: makePage(limit: 1, cursor: firstCursor),
+                    binding: mismatchedBinding)
+            }
+        }
         await #expect(throws: ContextCursorFailure.self) {
             try await store.listArtifacts(
                 forProject: secondProjectID,

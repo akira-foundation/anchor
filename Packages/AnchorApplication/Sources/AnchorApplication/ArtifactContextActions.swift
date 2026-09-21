@@ -64,10 +64,12 @@ public struct ListProjectArtifactsAction: Action {
     public func perform(
         _ request: ListProjectArtifactsRequest
     ) async throws -> ContextPage<ArtifactContextRecord> {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
             return try await artifacts.listArtifacts(
-                forProject: project.projectID, provider: request.provider, page: request.page)
+                forProject: project.projectID, provider: request.provider, page: request.page,
+                binding: ContextCursorBinding(
+                    workspaceURL: project.workspaceURL, generation: generation))
         }
     }
 }
@@ -90,8 +92,10 @@ public struct ReadProjectArtifactAction: Action {
 
     public func perform(_ request: ReadProjectArtifactRequest) async throws -> ArtifactContextChunk
     {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
+            let binding = ContextCursorBinding(
+                workspaceURL: project.workspaceURL, generation: generation)
             guard let record = try await artifacts.loadArtifact(withIdentifier: request.artifactID),
                 record.artifact.projectID == project.projectID
             else { throw ContextQueryFailure.entityNotFound }
@@ -106,7 +110,7 @@ public struct ReadProjectArtifactAction: Action {
             else { throw ContextQueryFailure.entityNotFound }
             let offset = try ArtifactChunkCursor.offset(
                 request.cursor, project: project.projectID,
-                artifact: record.artifact.id, revision: revision.id)
+                artifact: record.artifact.id, revision: revision.id, binding: binding)
             guard let bytes = try await content.readContent(forRevision: revision.id) else {
                 throw ContextQueryFailure.entityNotFound
             }
@@ -124,7 +128,8 @@ public struct ReadProjectArtifactAction: Action {
                 try end < bytes.endIndex
                 ? ArtifactChunkCursor.encode(
                     offset: end - bytes.startIndex,
-                    project: project.projectID, artifact: record.artifact.id, revision: revision.id)
+                    project: project.projectID, artifact: record.artifact.id, revision: revision.id,
+                    binding: binding)
                 : nil
             return ArtifactContextChunk(
                 artifact: record.artifact, revision: revision,

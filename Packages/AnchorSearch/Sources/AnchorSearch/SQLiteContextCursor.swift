@@ -25,12 +25,13 @@ enum SQLiteContextTimestamp {
 }
 
 enum SQLiteContextCursor {
-    private static let schemaVersion = 1
+    private static let schemaVersion = 2
 
     static func encode(
         operation: SQLiteContextCursorOperation,
         scopeBinding: String,
         filterBinding: String,
+        binding: ContextCursorBinding,
         position: SQLiteContextCursorPosition
     ) throws -> ContextPageCursor {
         let payload = Payload(
@@ -38,6 +39,8 @@ enum SQLiteContextCursor {
             operation: operation.rawValue,
             scopeBinding: scopeBinding,
             filterBinding: filterBinding,
+            workspacePath: binding.workspacePath,
+            generation: binding.generation.identifier,
             lastSortTimestamp: position.timestamp,
             lastIdentifier: position.identifier)
 
@@ -60,7 +63,8 @@ enum SQLiteContextCursor {
         _ cursor: ContextPageCursor?,
         operation: SQLiteContextCursorOperation,
         scopeBinding: String,
-        filterBinding: String
+        filterBinding: String,
+        binding: ContextCursorBinding
     ) throws -> SQLiteContextCursorPosition? {
         guard let cursor else { return nil }
         guard cursor.rawValue.allSatisfy(Self.isURLSafeBase64Character) else {
@@ -79,6 +83,8 @@ enum SQLiteContextCursor {
             payload.operation == operation.rawValue,
             payload.scopeBinding == scopeBinding,
             payload.filterBinding == filterBinding,
+            payload.workspacePath == binding.workspacePath,
+            payload.generation == binding.generation.identifier,
             !payload.lastIdentifier.isEmpty
         else {
             throw ContextCursorFailure.invalid
@@ -99,6 +105,8 @@ enum SQLiteContextCursor {
         let operation: String
         let scopeBinding: String
         let filterBinding: String
+        let workspacePath: String
+        let generation: UUID
         let lastSortTimestamp: Int64
         let lastIdentifier: String
     }

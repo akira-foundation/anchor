@@ -18,7 +18,8 @@ public protocol ArtifactContextReading: Sendable {
     func listArtifacts(
         forProject projectID: ProjectID,
         provider: AgentProvider?,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<ArtifactContextRecord>
 
     func loadArtifact(withIdentifier artifactID: ArtifactID) async throws -> ArtifactContextRecord?

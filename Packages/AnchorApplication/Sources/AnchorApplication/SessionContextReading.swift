@@ -15,7 +15,8 @@ public struct SessionContextRecord: Sendable, Hashable {
 public protocol ProjectConversationReading: Sendable {
     func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry>
 }
 
@@ -23,13 +24,15 @@ public protocol SessionContextReading: Sendable {
     func listSessions(
         forProject projectID: ProjectID,
         provider: AgentProvider?,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<SessionContextRecord>
 
     func loadSession(withIdentifier sessionID: SessionID) async throws -> SessionContextRecord?
 
     func loadConversationEntries(
         inSession sessionID: SessionID,
-        page: ContextPageRequest
+        page: ContextPageRequest,
+        binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry>
 }

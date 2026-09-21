@@ -8,6 +8,29 @@ import Testing
 
 @Suite("Bound SQLite context cursors")
 struct SQLiteContextCursorBoundaryTests {
+    @Test("all SQLite page cursors reject sibling workspaces and expired generations")
+    func cursorWorkspaceAndGenerationMustMatch() throws {
+        for operation in [
+            SQLiteContextCursorOperation.searchProject, .listSessions,
+            .loadConversationEntries,
+        ] {
+            let cursor = try SQLiteContextCursor.encode(
+                operation: operation, scopeBinding: projectID().rawValue,
+                filterBinding: "", binding: contextCursorTestBinding,
+                position: SQLiteContextCursorPosition(timestamp: 10, identifier: "entry"))
+            for mismatchedBinding in [
+                siblingWorkspaceCursorBinding,
+                expiredGenerationCursorBinding,
+            ] {
+                #expect(throws: ContextCursorFailure.invalid) {
+                    try SQLiteContextCursor.decode(
+                        cursor, operation: operation, scopeBinding: projectID().rawValue,
+                        filterBinding: "", binding: mismatchedBinding)
+                }
+            }
+        }
+    }
+
     @Test("a session cursor cannot be used for conversation entries")
     func cursorOperationMustMatch() async throws {
         let search = try await SQLiteContextSearch(database: try SQLiteDatabase(fileURL: nil))
@@ -95,7 +118,7 @@ struct SQLiteContextCursorBoundaryTests {
         let search = try await SQLiteContextSearch(database: try SQLiteDatabase(fileURL: nil))
         let unsupportedVersionCursor = makeCursor(
             rawJSON: """
-                {"version":2,"operation":"list-sessions","scopeBinding":"\(projectID().rawValue)","filterBinding":"","lastSortTimestamp":100000000,"lastIdentifier":"\(sessionID(131).rawValue)"}
+                {"version":1,"operation":"list-sessions","scopeBinding":"\(projectID().rawValue)","filterBinding":"","lastSortTimestamp":100000000,"lastIdentifier":"\(sessionID(131).rawValue)"}
                 """)
         let malformedCursor = ContextPageCursor(rawValue: "not-a-json-token")!
 

@@ -5,13 +5,14 @@ import Foundation
 
 extension SQLiteContextSearch {
     public func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest
+        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ProjectContextSearchHit>
     {
         let position = try SQLiteContextCursor.decode(
             page.cursor, operation: .searchProject,
-            scopeBinding: projectID.rawValue, filterBinding: text)
+            scopeBinding: projectID.rawValue, filterBinding: text, binding: binding)
         guard let expression = FullTextQuery.matchExpression(for: text) else {
             return ContextPage(records: [], nextCursor: nil)
         }
@@ -20,13 +21,14 @@ extension SQLiteContextSearch {
                 matching: expression, forProject: projectID, in: isolatedDatabase)
             return try Self.searchPage(
                 forProject: projectID, text: text, expression: expression, page: page,
-                position: position, in: isolatedDatabase)
+                position: position, binding: binding, in: isolatedDatabase)
         }
     }
 
     private static func searchPage(
         forProject projectID: ProjectID, text: String, expression: String,
         page: ContextPageRequest, position: SQLiteContextCursorPosition?,
+        binding: ContextCursorBinding,
         in database: isolated SQLiteDatabase
     ) throws -> ContextPage<ProjectContextSearchHit> {
         let messageQuery = Self.searchStatement(
@@ -60,6 +62,7 @@ extension SQLiteContextSearch {
             nextCursor = try SQLiteContextCursor.encode(
                 operation: .searchProject, scopeBinding: projectID.rawValue,
                 filterBinding: text,
+                binding: binding,
                 position: SQLiteContextCursorPosition(timestamp: timestamp, identifier: identifier))
         }
         return ContextPage(records: records, nextCursor: nextCursor)

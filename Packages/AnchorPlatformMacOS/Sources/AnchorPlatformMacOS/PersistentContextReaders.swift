@@ -22,12 +22,15 @@ actor PersistentContextReaders: ProjectContextReading, ArtifactContextReading,
         }
     }
     func listArtifacts(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ArtifactContextRecord>
     {
         try await read { artifacts, _ in
-            try await artifacts.listArtifacts(forProject: projectID, provider: provider, page: page)
+            try await artifacts.listArtifacts(
+                forProject: projectID, provider: provider, page: page,
+                binding: binding)
         }
     }
     func loadArtifact(withIdentifier artifactID: ArtifactID) async throws -> ArtifactContextRecord?
@@ -37,43 +40,52 @@ actor PersistentContextReaders: ProjectContextReading, ArtifactContextReading,
         }
     }
     func listSessions(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<SessionContextRecord>
     {
         try await read { _, sessions in
-            try await sessions.listSessions(forProject: projectID, provider: provider, page: page)
+            try await sessions.listSessions(
+                forProject: projectID, provider: provider, page: page,
+                binding: binding)
         }
     }
     func loadSession(withIdentifier sessionID: SessionID) async throws -> SessionContextRecord? {
         try await read { _, sessions in try await sessions.loadSession(withIdentifier: sessionID) }
     }
     func loadConversationEntries(
-        inSession sessionID: SessionID, page: ContextPageRequest
+        inSession sessionID: SessionID, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ConversationEntry>
     {
         try await read { _, sessions in
-            try await sessions.loadConversationEntries(inSession: sessionID, page: page)
+            try await sessions.loadConversationEntries(
+                inSession: sessionID, page: page,
+                binding: binding)
         }
     }
     func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest
+        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ProjectContextSearchHit>
     {
         try await read { _, search in
-            try await search.searchContext(forProject: projectID, matching: text, page: page)
+            try await search.searchContext(
+                forProject: projectID, matching: text, page: page,
+                binding: binding)
         }
     }
 
     func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest
+        page: ContextPageRequest, binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
         try await read { _, sessions in
             try await sessions.loadConversationEntries(
-                inSession: sessionID, forProject: projectID, page: page)
+                inSession: sessionID, forProject: projectID, page: page, binding: binding)
         }
     }
 

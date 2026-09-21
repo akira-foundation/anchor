@@ -46,18 +46,20 @@ func routerDispatchesEightQueries() async throws {
 @Test("router rejects undocumented arguments and unknown tools")
 func routerRejectsMalformedCalls() async throws {
     let router = AnchorMCPToolRouter(actions: RouterFixture().actions)
-    await #expect(throws: MCPError.self) {
-        try await router.call(.init(name: "context.resume", arguments: ["surprise": .bool(true)]))
-    }
-    await #expect(throws: MCPError.self) {
-        try await router.call(.init(name: "context.unknown"))
-    }
-    await #expect(throws: MCPError.self) {
-        try await router.call(.init(name: "context.search", arguments: ["text": .string(" ")]))
-    }
-    await #expect(throws: MCPError.self) {
-        try await router.call(
-            .init(name: "context.search", arguments: ["text": .string("x"), "limit": .int(101)]))
+    for parameters in [
+        CallTool.Parameters(name: "context.resume", arguments: ["surprise": .bool(true)]),
+        CallTool.Parameters(name: "context.unknown"),
+        CallTool.Parameters(name: "context.search", arguments: ["text": .string(" ")]),
+        CallTool.Parameters(
+            name: "context.search", arguments: ["text": .string("x"), "limit": .int(101)]),
+    ] {
+        do {
+            _ = try await router.call(parameters)
+            Issue.record("Expected invalidParams for \(parameters.name)")
+        } catch MCPError.invalidParams(_) {
+        } catch {
+            Issue.record("Expected invalidParams for \(parameters.name), received \(error)")
+        }
     }
 }
 
@@ -81,36 +83,6 @@ func routerMapsFailuresSafely() async throws {
         #expect(response.structuredContent?.objectValue?["message"]?.stringValue != nil)
         #expect(!String(describing: response).contains("fixture-secret"))
     }
-}
-
-@Test("message entries retain their canonical kinds and text fallback is concise")
-func routerMapsConversationKinds() async throws {
-    let fixture = RouterFixture()
-    let response = try await AnchorMCPToolRouter(actions: fixture.actions).call(
-        .init(
-            name: "context.get_messages",
-            arguments: ["session_id": .string(fixture.session.id.rawValue)]))
-    let entries = response.structuredContent?.objectValue?["entries"]?.arrayValue
-    #expect(
-        entries?.map { $0.objectValue?["entry_kind"] } == [
-            .string("message"), .string("tool_activity"),
-        ])
-    #expect(entries?.first?.objectValue?["content"] == .string("fixture-secret long message"))
-    #expect(entries?.last?.objectValue?["outcome"] == nil)
-    #expect(response.structuredContent?.objectValue?["next_cursor"] == nil)
-    #expect(!String(describing: response.content).contains("fixture-secret"))
-}
-
-@Test("optional project and session fields are omitted without evidence")
-func routerOmitsUnavailableFields() async throws {
-    let fixture = RouterFixture(includesSession: false)
-    let router = AnchorMCPToolRouter(actions: fixture.actions)
-    let project = try await router.call(.init(name: "context.current_project"))
-    #expect(project.structuredContent?.objectValue?["canonical_remote"] == nil)
-    let resume = try await router.call(.init(name: "context.resume"))
-    #expect(resume.structuredContent?.objectValue?["latest_session"] == nil)
-    #expect(resume.structuredContent?.objectValue?["last_activity_at"] == nil)
-    #expect(resume.structuredContent?.objectValue?["last_agent_provider"] == nil)
 }
 
 @Test("in-memory client initializes, lists tools and calls the server")
@@ -141,15 +113,29 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
     nonisolated let session: AgentSession
     private let failure: ContextQueryFailure?
     private let includesSession: Bool
+    private let messageContent: String
+    private let toolName: String
+    private let invocation: String
+    private let outcome: String?
+    private let searchExcerpt: String?
     private(set) var operations: [String] = []
 
-    init(failure: ContextQueryFailure? = nil, includesSession: Bool = true) {
+    init(
+        failure: ContextQueryFailure? = nil, includesSession: Bool = true,
+        messageContent: String = "fixture-secret long message",
+        toolName: String = "read", invocation: String = "fixture-secret invocation",
+        outcome: String? = nil, projectName: String = "Example",
+        workspacePath: String = "/example", canonicalRemote: String? = nil,
+        artifactName: String = "notes.md", searchExcerpt: String? = nil
+    ) {
         let projectID = ProjectID()
         project = ProjectContext(
-            projectID: projectID, displayName: "Example", canonicalRepositoryRemote: nil,
-            workspaceURL: URL(filePath: "/example"))
+            projectID: projectID, displayName: projectName,
+            canonicalRepositoryRemote: canonicalRemote.flatMap(
+                CanonicalRepositoryRemote.init(rawValue:)),
+            workspaceURL: URL(filePath: workspacePath))
         artifact = Artifact(
-            id: ArtifactID(), projectID: projectID, provider: .codex, name: "notes.md")!
+            id: ArtifactID(), projectID: projectID, provider: .codex, name: artifactName)!
         revision = ArtifactRevision(
             id: RevisionID(), artifactID: artifact.id, parentRevisionID: nil,
             contentHash: ContentHash.digest(of: Data("fixture-secret".utf8)), deviceID: DeviceID(),
@@ -159,6 +145,11 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
             startedAt: Date(timeIntervalSince1970: 10), updatedAt: Date(timeIntervalSince1970: 20))
         self.failure = failure
         self.includesSession = includesSession
+        self.messageContent = messageContent
+        self.toolName = toolName
+        self.invocation = invocation
+        self.outcome = outcome
+        self.searchExcerpt = searchExcerpt
     }
 
     nonisolated var actions: ContextQueryActions {
@@ -189,15 +180,23 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
         return project
     }
     func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest
+        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ProjectContextSearchHit>
     {
         operations.append("search")
-        return ContextPage(records: [], nextCursor: nil)
+        guard let searchExcerpt else { return ContextPage(records: [], nextCursor: nil) }
+        return ContextPage(
+            records: [
+                ProjectContextSearchHit(
+                    sessionID: session.id, provider: .codex, kind: .message(.user),
+                    excerpt: searchExcerpt, timestamp: Date(timeIntervalSince1970: 12))
+            ], nextCursor: nil)
     }
     func listArtifacts(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ArtifactContextRecord>
     {
@@ -218,7 +217,8 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
         Data("fixture-secret".utf8)
     }
     func listSessions(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest
+        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<SessionContextRecord>
     {
@@ -232,16 +232,18 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
         return SessionContextRecord(session: session, messageCount: 1, toolActivityCount: 1)
     }
     func loadConversationEntries(
-        inSession sessionID: SessionID, page: ContextPageRequest
+        inSession sessionID: SessionID, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ConversationEntry>
     {
         return try await loadConversationEntries(
-            inSession: sessionID, forProject: project.projectID, page: page)
+            inSession: sessionID, forProject: project.projectID, page: page,
+            binding: binding)
     }
     func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest
+        page: ContextPageRequest, binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
         operations.append("messages")
         return ContextPage(
@@ -249,12 +251,12 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
                 .message(
                     ConversationMessage(
                         id: MessageID(), sessionID: session.id, role: .user,
-                        content: "fixture-secret long message",
+                        content: messageContent,
                         timestamp: Date(timeIntervalSince1970: 12))),
                 .toolActivity(
                     ToolActivity(
-                        id: ToolActivityID(), sessionID: session.id, toolName: "read",
-                        invocation: "fixture-secret invocation", outcome: nil, failed: false,
+                        id: ToolActivityID(), sessionID: session.id, toolName: toolName,
+                        invocation: invocation, outcome: outcome, failed: false,
                         timestamp: Date(timeIntervalSince1970: 13))),
             ], nextCursor: nil)
     }

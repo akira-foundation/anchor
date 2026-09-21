@@ -27,7 +27,8 @@ public struct ProjectContextSearchHit: Sendable, Hashable {
 
 public protocol ProjectContextSearching: Sendable {
     func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest
+        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
+        binding: ContextCursorBinding
     )
         async throws -> ContextPage<ProjectContextSearchHit>
 }

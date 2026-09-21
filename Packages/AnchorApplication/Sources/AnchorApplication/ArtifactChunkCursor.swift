@@ -5,6 +5,8 @@ enum ArtifactChunkCursor {
     private struct Payload: Codable {
         let version: Int
         let operation: String
+        let workspacePath: String
+        let generation: UUID
         let project: String
         let artifact: String
         let revision: String
@@ -13,7 +15,7 @@ enum ArtifactChunkCursor {
 
     static func offset(
         _ cursor: ContextPageCursor?, project: ProjectID, artifact: ArtifactID,
-        revision: RevisionID
+        revision: RevisionID, binding: ContextCursorBinding
     ) throws -> Int {
         guard let cursor else { return 0 }
         guard
@@ -26,7 +28,9 @@ enum ArtifactChunkCursor {
         token.append(String(repeating: "=", count: (4 - token.count % 4) % 4))
         guard let bytes = Data(base64Encoded: token),
             let payload = try? JSONDecoder().decode(Payload.self, from: bytes),
-            payload.version == 1, payload.operation == "read-artifact",
+            payload.version == 2, payload.operation == "read-artifact",
+            payload.workspacePath == binding.workspacePath,
+            payload.generation == binding.generation.identifier,
             payload.project == project.rawValue,
             payload.artifact == artifact.rawValue, payload.revision == revision.rawValue,
             payload.offset > 0
@@ -35,12 +39,15 @@ enum ArtifactChunkCursor {
     }
 
     static func encode(
-        offset: Int, project: ProjectID, artifact: ArtifactID, revision: RevisionID
+        offset: Int, project: ProjectID, artifact: ArtifactID, revision: RevisionID,
+        binding: ContextCursorBinding
     )
         throws -> ContextPageCursor
     {
         let payload = Payload(
-            version: 1, operation: "read-artifact", project: project.rawValue,
+            version: 2, operation: "read-artifact",
+            workspacePath: binding.workspacePath, generation: binding.generation.identifier,
+            project: project.rawValue,
             artifact: artifact.rawValue, revision: revision.rawValue, offset: offset)
         let token = try JSONEncoder().encode(payload).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")

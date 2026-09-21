@@ -148,6 +148,55 @@ struct ContextQueryActionTests {
         }
     }
 
+    @Test("legacy artifact cursors expire instead of resuming a new read model")
+    func legacyArtifactCursorIsInvalid() async throws {
+        let fixture = try ContextQueryFixture()
+        let legacyPayload = """
+            {"version":1,"operation":"read-artifact","project":"\(fixture.project.projectID.rawValue)","artifact":"\(fixture.artifact.id.rawValue)","revision":"\(fixture.revision.id.rawValue)","offset":2}
+            """
+        let token = Data(legacyPayload.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        await #expect(throws: ContextQueryFailure.invalidCursor) {
+            try await fixture.artifactAction.perform(
+                try #require(
+                    ReadProjectArtifactRequest(
+                        artifactID: fixture.artifact.id,
+                        cursor: ContextPageCursor(rawValue: token))))
+        }
+    }
+
+    @Test("artifact chunks reject sibling workspaces and expired generations")
+    func artifactCursorScopeMustMatch() async throws {
+        let fixture = try ContextQueryFixture()
+        let firstChunk = try await fixture.artifactAction.perform(
+            try #require(
+                ReadProjectArtifactRequest(
+                    artifactID: fixture.artifact.id, byteLimit: 4)))
+        let cursor = try #require(firstChunk.nextCursor)
+        let siblingProject = ProjectContext(
+            projectID: fixture.project.projectID,
+            displayName: fixture.project.displayName,
+            canonicalRepositoryRemote: nil,
+            workspaceURL: URL(filePath: "/sibling/query"))
+        let siblingScope = CursorScope(project: siblingProject, generation: fixture.generation)
+        let expiredScope = CursorScope(
+            project: fixture.project,
+            generation: ContextReadGeneration(identifier: UUID()))
+        for scope in [siblingScope, expiredScope] {
+            let action = ReadProjectArtifactAction(
+                workspace: scope, artifacts: fixture, content: fixture,
+                availability: scope)
+            await #expect(throws: ContextQueryFailure.invalidCursor) {
+                try await action.perform(
+                    try #require(
+                        ReadProjectArtifactRequest(
+                            artifactID: fixture.artifact.id, cursor: cursor, byteLimit: 4)))
+            }
+        }
+    }
+
     @Test("session queries refuse entities outside the authorized project")
     func sessionOwnershipIsRequired() async throws {
         let fixture = try ContextQueryFixture()
@@ -190,4 +239,12 @@ struct ContextQueryActionTests {
             }
         }
     }
+}
+
+private struct CursorScope: AuthorizedProjectContextReading, ContextAvailabilityReading {
+    let project: ProjectContext
+    let generation: ContextReadGeneration
+
+    func loadAuthorizedProjectContext() async throws -> ProjectContext { project }
+    func loadAvailableGeneration() async throws -> ContextReadGeneration { generation }
 }

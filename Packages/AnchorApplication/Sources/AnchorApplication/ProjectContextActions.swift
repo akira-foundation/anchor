@@ -21,7 +21,7 @@ public struct ResolveCurrentProjectAction: Action {
     }
 
     public func perform(_ request: ProjectContextRequest) async throws -> ProjectContext {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { _ in
             try await workspace.loadAuthorizedProjectContext()
         }
     }
@@ -54,13 +54,15 @@ public struct BuildMinimalProjectResumeAction: Action {
     }
 
     public func perform(_ request: ProjectContextRequest) async throws -> MinimalProjectResume {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
             guard let page = ContextPageRequest(limit: 1, maximumLimit: 100) else {
                 throw ContextQueryFailure.readFailed
             }
             let newest = try await sessions.listSessions(
-                forProject: project.projectID, provider: nil, page: page)
+                forProject: project.projectID, provider: nil, page: page,
+                binding: ContextCursorBinding(
+                    workspaceURL: project.workspaceURL, generation: generation))
             return MinimalProjectResume(
                 project: project, latestSession: newest.records.first?.session)
         }

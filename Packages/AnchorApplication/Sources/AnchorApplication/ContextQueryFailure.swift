@@ -14,11 +14,11 @@ public enum ContextCursorFailure: Error, Sendable, Equatable {
 
 func queryContext<Output: Sendable>(
     availability: any ContextAvailabilityReading,
-    _ operation: () async throws -> Output
+    _ operation: (ContextReadGeneration) async throws -> Output
 ) async throws(ContextQueryFailure) -> Output {
     do {
         let generation = try await availability.loadAvailableGeneration()
-        let output = try await operation()
+        let output = try await operation(generation)
         guard try await availability.loadAvailableGeneration() == generation else {
             throw ContextQueryFailure.contextUnavailable
         }

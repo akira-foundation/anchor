@@ -51,10 +51,12 @@ public struct ListProjectSessionsAction: Action {
     public func perform(
         _ request: ListProjectSessionsRequest
     ) async throws -> ContextPage<SessionContextRecord> {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
             return try await sessions.listSessions(
-                forProject: project.projectID, provider: request.provider, page: request.page)
+                forProject: project.projectID, provider: request.provider, page: request.page,
+                binding: ContextCursorBinding(
+                    workspaceURL: project.workspaceURL, generation: generation))
         }
     }
 }
@@ -74,7 +76,7 @@ public struct ReadProjectSessionAction: Action {
     }
 
     public func perform(_ request: ReadProjectSessionRequest) async throws -> SessionContextRecord {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { _ in
             let project = try await workspace.loadAuthorizedProjectContext()
             guard let record = try await sessions.loadSession(withIdentifier: request.sessionID),
                 record.session.projectID == project.projectID
@@ -101,11 +103,13 @@ public struct ReadSessionMessagesAction: Action {
     public func perform(
         _ request: ReadSessionMessagesRequest
     ) async throws -> ContextPage<ConversationEntry> {
-        try await queryContext(availability: availability) {
+        try await queryContext(availability: availability) { generation in
             let project = try await workspace.loadAuthorizedProjectContext()
             return try await entries.loadConversationEntries(
                 inSession: request.sessionID,
-                forProject: project.projectID, page: request.page)
+                forProject: project.projectID, page: request.page,
+                binding: ContextCursorBinding(
+                    workspaceURL: project.workspaceURL, generation: generation))
         }
     }
 }

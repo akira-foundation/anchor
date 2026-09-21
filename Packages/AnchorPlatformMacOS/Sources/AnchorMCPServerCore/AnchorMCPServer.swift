@@ -28,4 +28,9 @@ public struct AnchorMCPServer: Sendable {
     public func waitUntilCompleted() async {
         await server.waitUntilCompleted()
     }
+
+    public func runStandardInputOutput() async throws {
+        try await start(transport: StdioTransport())
+        await waitUntilCompleted()
+    }
 }

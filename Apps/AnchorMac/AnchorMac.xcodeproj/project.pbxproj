@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A9C000000000000000000001 /* AnchorMCPServerCore in Frameworks */ = {isa = PBXBuildFile; productRef = A9C000000000000000000002 /* AnchorMCPServerCore */; };
+		A9C000000000000000000003 /* AnchorMCPServer in Embed Helpers */ = {isa = PBXBuildFile; fileRef = A9C000000000000000000004 /* AnchorMCPServer */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		074F800F3045954F00FF709E /* AnchorPlatformMacOS in Frameworks */ = {isa = PBXBuildFile; productRef = A1D0000000000000000000A1 /* AnchorPlatformMacOS */; };
 		074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */ = {isa = PBXBuildFile; productRef = A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */; };
 		074F80113045954F00FF709E /* AnchorStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A3D0000000000000000000A3 /* AnchorStorage */; };
@@ -17,11 +19,41 @@
 		075F80123045954F00FF7003 /* AnchorIntelligence in Frameworks */ = {isa = PBXBuildFile; productRef = A8D0000000000000000000A8 /* AnchorIntelligence */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A9C000000000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 772232515AF78FB045C23CB9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A9C000000000000000000006;
+			remoteInfo = AnchorMCPServer;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A9C000000000000000000007 /* Embed Helpers */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				A9C000000000000000000003 /* AnchorMCPServer in Embed Helpers */,
+			);
+			name = "Embed Helpers";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A9C000000000000000000004 /* AnchorMCPServer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = AnchorMCPServer; sourceTree = BUILT_PRODUCTS_DIR; };
 		4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AnchorMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A9C000000000000000000008 /* AnchorMCPServer */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AnchorMCPServer;
+			sourceTree = "<group>";
+		};
 		1F8D3D29BE3A06E20BF15766 /* AnchorMac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AnchorMac;
@@ -30,6 +62,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A9C000000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A9C000000000000000000001 /* AnchorMCPServerCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FDCB4BDB250BEC4A38144233 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -52,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				4EEBBB1FE5543644A7F49D6C /* AnchorMac.app */,
+				A9C000000000000000000004 /* AnchorMCPServer */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -60,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				1F8D3D29BE3A06E20BF15766 /* AnchorMac */,
+				A9C000000000000000000008 /* AnchorMCPServer */,
 				0C1453DE0237AB3065FD4CB1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -67,6 +109,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A9C000000000000000000006 /* AnchorMCPServer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A9C00000000000000000000A /* Build configuration list for PBXNativeTarget "AnchorMCPServer" */;
+			buildPhases = (
+				A9C00000000000000000000B /* Sources */,
+				A9C000000000000000000009 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A9C000000000000000000008 /* AnchorMCPServer */,
+			);
+			name = AnchorMCPServer;
+			packageProductDependencies = (
+				A9C000000000000000000002 /* AnchorMCPServerCore */,
+			);
+			productName = AnchorMCPServer;
+			productReference = A9C000000000000000000004 /* AnchorMCPServer */;
+			productType = "com.apple.product-type.tool";
+		};
 		C03A415FDA2AAD117FA48686 /* AnchorMac */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 27510C4AE975A1B7BE166AD3 /* Build configuration list for PBXNativeTarget "AnchorMac" */;
@@ -74,10 +138,12 @@
 				9B911746492F6BAF77BFBA79 /* Sources */,
 				FDCB4BDB250BEC4A38144233 /* Frameworks */,
 				5D0E629DA2B74231AADD31D5 /* Resources */,
+				A9C000000000000000000007 /* Embed Helpers */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A9C00000000000000000000C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1F8D3D29BE3A06E20BF15766 /* AnchorMac */,
@@ -107,6 +173,9 @@
 				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
+					A9C000000000000000000006 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 					C03A415FDA2AAD117FA48686 = {
 						CreatedOnToolsVersion = 26.6;
 					};
@@ -137,6 +206,7 @@
 			projectRoot = "";
 			targets = (
 				C03A415FDA2AAD117FA48686 /* AnchorMac */,
+				A9C000000000000000000006 /* AnchorMCPServer */,
 			);
 		};
 /* End PBXProject section */
@@ -152,6 +222,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A9C00000000000000000000B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9B911746492F6BAF77BFBA79 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -161,7 +238,49 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A9C00000000000000000000C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A9C000000000000000000006 /* AnchorMCPServer */;
+			targetProxy = A9C000000000000000000005 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		A9C00000000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AnchorMCPServer/AnchorMCPServer.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.akira.anchor.mcp-server";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A9C00000000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = AnchorMCPServer/AnchorMCPServer.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZF76N8225L;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.akira.anchor.mcp-server";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		21CDA62BEECAB53F3781D59F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -255,6 +374,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A9C00000000000000000000A /* Build configuration list for PBXNativeTarget "AnchorMCPServer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9C00000000000000000000D /* Debug */,
+				A9C00000000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		27510C4AE975A1B7BE166AD3 /* Build configuration list for PBXNativeTarget "AnchorMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -311,6 +439,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A9C000000000000000000002 /* AnchorMCPServerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorMCPServerCore;
+		};
 		A1D0000000000000000000A1 /* AnchorPlatformMacOS */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AnchorPlatformMacOS;

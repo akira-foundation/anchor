@@ -17,7 +17,10 @@ extension WorkspaceObservationCoordinatorTests {
         remote: InMemoryStorageProvider = InMemoryStorageProvider(),
         observer: FileSystemEventObserver = FileSystemEventObserver(
             silenceWindow: .milliseconds(200)),
-        discoverer: (any ArtifactDiscovering)? = nil
+        discoverer: (any ArtifactDiscovering)? = nil,
+        artifactIndex: (any ArtifactContextIndexing)? = nil,
+        contextStatus: ContextReadModelStatusStore? = nil,
+        sessionContext: (any SessionContextRecording)? = nil
     ) -> (WorkspaceObservationCoordinator, StoredSyncOperationJournal) {
         let operationJournal = StoredSyncOperationJournal(storage: storage)
         let coordinator = WorkspaceObservationCoordinator(
@@ -50,6 +53,9 @@ extension WorkspaceObservationCoordinatorTests {
             synchronizer: makeSynchronizer(
                 storage: storage, remote: remote, operations: operationJournal),
             presences: StoredDevicePresenceRegistry(storage: remote),
+            sessionContext: sessionContext,
+            artifactIndex: artifactIndex,
+            contextStatus: contextStatus,
             now: { Date(timeIntervalSince1970: 1_000) }
         )
 

@@ -43,14 +43,14 @@ public struct StoredSessionContextRecorder: SessionContextRecording {
         for revision in revisions where revision.artifact.isAgentSessionTranscript {
             do {
                 guard let content = try await contentStore.content(forRevision: revision.revisionID)
-                else { continue }
+                else { throw ContextQueryFailure.entityNotFound }
 
                 let report = try await actionPipeline.recordLiveSessionContext(
                     RecordSessionContextRequest(
                         artifact: revision.artifact,
                         content: content,
                         contentHash: revision.contentHash,
-                        recordedAt: instant
+                        recordedAt: revision.revision.createdAt
                     ))
 
                 guard let description = report.knowledgeRefusal else { continue }

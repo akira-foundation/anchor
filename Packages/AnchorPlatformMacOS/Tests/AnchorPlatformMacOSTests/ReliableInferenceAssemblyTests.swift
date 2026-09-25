@@ -108,7 +108,8 @@ struct ReliableInferenceAssemblyTests {
             statement: statement(proposal: proposal, confirmation: confirmation))
         let context = try await ContextEngineAssembly.makeSessionContext(
             storage: await assembleStorage(),
-            statementInference: inference
+            statementInference: inference,
+            database: SQLiteDatabase(fileURL: nil)
         )
         let transcript = AgentTranscript(
             session: session(),

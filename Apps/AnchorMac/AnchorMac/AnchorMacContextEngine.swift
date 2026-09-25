@@ -114,15 +114,25 @@ final class AnchorMacContextEngine {
 
         let sessionFileIndex = await ContextEngineAssembly.makeSessionFileIndex(
             inSupportDirectoryAt: supportDirectoryURL)
-        let sessionContext = try? await ContextEngineAssembly.makeSessionContext(
-            storage: storage, inferringKnowledge: observed.infersKnowledge)
+        let readModel = try await ContextReadModelAssembly.openWriter(
+            supportDirectoryURL: supportDirectoryURL,
+            configurationURL: ObservedWorkspaceConfiguration.defaultFileURL(
+                inSupportDirectoryAt: supportDirectoryURL),
+            remoteReader: GitCommandRepositoryRemoteReader())
+        let sessionContext = try await ContextEngineAssembly.makeSessionContext(
+            storage: storage, inferringKnowledge: observed.infersKnowledge,
+            database: readModel.database)
         let sessionsOnDisk = ContextEngineAssembly.sessionsOnDisk(
             forProject: observed.projectID,
             inWorkspaceAt: observed.workspaceURL,
             sessionFileIndex: sessionFileIndex
         )
-        let rebuild = await sessionContext?.rebuilder.rebuild(from: sessionsOnDisk, at: Date())
-        let initialRefusals = (rebuild?.refusals ?? []).map {
+        let rebuild = await sessionContext.rebuilder.rebuild(from: sessionsOnDisk, at: Date())
+        let readModelRebuilder = ContextEngineAssembly.makeReadModelRebuilder(
+            writer: readModel, storage: storage, sessionContext: sessionContext,
+            sessionFileIndex: sessionFileIndex)
+        let indexedSessions = try await readModelRebuilder.rebuild()
+        let initialRefusals = rebuild.refusals.map {
             "indexing \($0.artifactName): \($0.description)"
         }
 
@@ -132,7 +142,9 @@ final class AnchorMacContextEngine {
             storage: storage,
             supportDirectoryURL: supportDirectoryURL,
             sessionFileIndex: sessionFileIndex,
-            sessionContext: sessionContext?.recorder,
+            sessionContext: sessionContext.recorder,
+            artifactIndex: sessionContext.artifactIndex,
+            contextStatus: readModel.status,
             initialRefusals: initialRefusals
         )
 
@@ -142,23 +154,33 @@ final class AnchorMacContextEngine {
         coordinator = assembled
         assembledSessionContext = sessionContext
         rebuildSessionContextIfInferenceBecameReady = { previousStatus in
-            guard let sessionContext else { return nil }
-
-            return await sessionContext.rebuildSessionContextIfInferenceBecameReady(
-                after: previousStatus,
-                from: ContextEngineAssembly.sessionsOnDisk(
-                    forProject: observed.projectID,
-                    inWorkspaceAt: observed.workspaceURL,
-                    sessionFileIndex: sessionFileIndex
-                ),
-                at: Date()
-            )
+            guard case .unavailable = previousStatus,
+                await sessionContext.inferenceStatus() == .ready
+            else { return nil }
+            do {
+                let update = try await readModel.status.beginUpdate()
+                let recovered = await sessionContext.rebuildSessionContextIfInferenceBecameReady(
+                    after: previousStatus,
+                    from: ContextEngineAssembly.sessionsOnDisk(
+                        forProject: observed.projectID,
+                        inWorkspaceAt: observed.workspaceURL,
+                        sessionFileIndex: sessionFileIndex
+                    ),
+                    at: Date()
+                )
+                try await readModel.status.completeUpdate(
+                    update, succeeded: recovered?.refusals.isEmpty ?? true)
+                return recovered
+            } catch {
+                await assembled.recordRefusals(["updating context availability: \(error)"])
+                return nil
+            }
         }
         state = .watching(
             projectName: observed.projectName,
             storage: storage.choice,
-            indexedSessions: rebuild?.indexedSessions,
-            inferenceStatus: await sessionContext?.inferenceStatus() ?? .disabled,
+            indexedSessions: indexedSessions,
+            inferenceStatus: await sessionContext.inferenceStatus(),
             refusals: await assembled.recordedRefusals
         )
     }

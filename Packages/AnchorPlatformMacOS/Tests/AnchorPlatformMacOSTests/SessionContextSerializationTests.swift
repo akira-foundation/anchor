@@ -1,6 +1,7 @@
 import AnchorApplication
 import AnchorDomain
 import AnchorIntelligence
+import AnchorPersistence
 import AnchorStorage
 import CryptoKit
 import Foundation
@@ -107,7 +108,8 @@ struct SessionContextSerializationTests {
             key: .init(size: .bits256)
         )
         let context = try await ContextEngineAssembly.makeSessionContext(
-            storage: storage, inferringKnowledge: true, statementInference: inference)
+            storage: storage, inferringKnowledge: true, statementInference: inference,
+            database: SQLiteDatabase(fileURL: nil))
         let transcript = AgentTranscript(
             session: AgentSession(
                 id: sessionID, projectID: projectID, provider: .claude,

@@ -16,6 +16,8 @@ public enum ContextEngineAssembly {
         supportDirectoryURL: URL,
         sessionFileIndex: SessionFileIndex? = nil,
         sessionContext: SessionContextRecording? = nil,
+        artifactIndex: (any ArtifactContextIndexing)? = nil,
+        contextStatus: ContextReadModelStatusStore? = nil,
         initialRefusals: [String] = []
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
@@ -42,6 +44,8 @@ public enum ContextEngineAssembly {
             synchronizer: makeSynchronizer(storage: storage, operations: operationJournal),
             presences: makePresences(storage: storage),
             sessionContext: sessionContext,
+            artifactIndex: artifactIndex,
+            contextStatus: contextStatus,
             initialRefusals: initialRefusals
         )
     }
@@ -63,20 +67,7 @@ public enum ContextEngineAssembly {
     public static func makeSessionContext(
         storage: AssembledContextStorage,
         inferringKnowledge: Bool = false,
-        statementInference: (any StatementInferring)? = nil
-    ) async throws -> AssembledSessionContext {
-        try await makeSessionContext(
-            storage: storage,
-            inferringKnowledge: inferringKnowledge,
-            statementInference: statementInference,
-            database: SQLiteDatabase(fileURL: nil)
-        )
-    }
-
-    static func makeSessionContext(
-        storage: AssembledContextStorage,
-        inferringKnowledge: Bool,
-        statementInference: (any StatementInferring)?,
+        statementInference: (any StatementInferring)? = nil,
         database: SQLiteDatabase
     ) async throws -> AssembledSessionContext {
         let search = try await SQLiteContextSearch(database: database)
@@ -93,12 +84,34 @@ public enum ContextEngineAssembly {
 
         return AssembledSessionContext(
             search: search,
+            sessions: search,
+            transcripts: search,
+            artifactIndex: try await SQLiteArtifactContextStore(database: database),
             recorder: StoredSessionContextRecorder(
                 contentStore: StoredArtifactContentStore(storage: storage.local),
                 actionPipeline: actionPipeline),
             rebuilder: DiscoveredSessionContextRebuilder(actionPipeline: actionPipeline),
             statementInference: inference
         )
+    }
+
+    public static func makeReadModelRebuilder(
+        writer: ContextReadModelWriter, storage: AssembledContextStorage,
+        sessionContext: AssembledSessionContext, sessionFileIndex: SessionFileIndex? = nil
+    ) -> ContextReadModelRebuilder {
+        let observed = writer.observedWorkspace
+        return ContextReadModelRebuilder(
+            projectID: observed.projectID,
+            discoverer: makeDiscoverer(
+                workspaceURL: observed.workspaceURL, sessionFileIndex: sessionFileIndex),
+            journal: makeRevisionJournal(over: storage.local),
+            artifacts: sessionContext.artifactIndex,
+            transcripts: sessionContext.transcripts,
+            canonicalSessions: {
+                sessionsOnDisk(
+                    forProject: observed.projectID, inWorkspaceAt: observed.workspaceURL,
+                    sessionFileIndex: sessionFileIndex)
+            }, status: writer.status)
     }
 
     private static func configuredInference(

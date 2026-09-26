@@ -196,7 +196,7 @@ public struct SQLiteArtifactContextStore:
             workspaceURL: URL(filePath: workspacePath))
     }
 
-    private static func artifactContextRecord(
+    static func artifactContextRecord(
         from row: [String: SQLiteValue]
     ) throws -> ArtifactContextRecord {
         guard let artifactID = row["artifact_id"]?.text.flatMap(ArtifactID.init(rawValue:)),
@@ -228,7 +228,7 @@ public struct SQLiteArtifactContextStore:
         Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
     }
 
-    private static func date(fromRevisedAt revisedAt: Int64) -> Date {
+    static func date(fromRevisedAt revisedAt: Int64) -> Date {
         Date(timeIntervalSince1970: TimeInterval(revisedAt) / 1_000_000)
     }
 }

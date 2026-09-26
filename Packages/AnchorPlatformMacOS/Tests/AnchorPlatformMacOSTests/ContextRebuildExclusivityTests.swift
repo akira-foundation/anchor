@@ -31,7 +31,10 @@ struct ContextRebuildExclusivityTests {
                 await captured.open()
                 await replacement.wait()
                 return []
-            }, status: writer.status)
+            },
+            presences: ReadModelDevicePresenceRegistry(
+                snapshot: writer.presences, remote: nil),
+            status: writer.status)
         let rebuilding = Task { try await rebuild.rebuild() }
         await captured.wait()
         let second = try #require(

@@ -5,6 +5,65 @@ import Testing
 
 @testable import AnchorMCPServerCore
 
+@Test("resume maps the complete compact persisted context")
+func routerMapsCompleteResume() async throws {
+    let fixture = RouterFixture()
+    let response = try await AnchorMCPToolRouter(actions: fixture.actions).call(
+        .init(name: "context.resume"))
+    let fields = try #require(response.structuredContent?.objectValue)
+    #expect(
+        Set(fields.keys) == [
+            "project", "last_activity_at", "last_device", "last_agent_provider",
+            "recent_session", "current_plan", "latest_brainstorm", "relevant_graphs",
+            "recent_decisions", "open_todos", "open_questions",
+        ])
+    #expect(fields["last_activity_at"] == .string(Date(timeIntervalSince1970: 40).ISO8601Format()))
+    #expect(fields["last_agent_provider"] == .string("codex"))
+    let device = try #require(fields["last_device"]?.objectValue)
+    #expect(device["device_id"] == .string(fixture.populatedResume.lastPresence!.deviceID.rawValue))
+    #expect(device["last_seen_at"] == .string(Date(timeIntervalSince1970: 30).ISO8601Format()))
+    let session = try #require(fields["recent_session"]?.objectValue)
+    #expect(session["session_id"] == .string(fixture.session.id.rawValue))
+    #expect(session["message_count"] == .int(7))
+    #expect(session["tool_activity_count"] == .int(3))
+
+    let plan = try #require(fields["current_plan"]?.objectValue)
+    #expect(
+        plan["artifact_id"]
+            == .string(fixture.populatedResume.currentPlan!.artifact.id.rawValue))
+    #expect(
+        plan["revision_id"]
+            == .string(fixture.populatedResume.currentPlan!.latestRevision!.id.rawValue))
+    #expect(plan["name"] == .string("docs/superpowers/plans/current.md"))
+    #expect(plan["updated_at"] == .string(Date(timeIntervalSince1970: 31).ISO8601Format()))
+    #expect(
+        fields["latest_brainstorm"]?.objectValue?["updated_at"]
+            == .string(Date(timeIntervalSince1970: 32).ISO8601Format()))
+    #expect(fields["relevant_graphs"]?.arrayValue?.count == 1)
+
+    let decisions = try #require(fields["recent_decisions"]?.objectValue)
+    #expect(decisions["has_more"] == .bool(true))
+    let decision = try #require(decisions["entries"]?.arrayValue?.first?.objectValue)
+    let expectedDecision = fixture.populatedResume.recentDecisions[0]
+    #expect(decision["knowledge_entry_id"] == .string(expectedDecision.id.rawValue))
+    #expect(decision["summary"] == .string(expectedDecision.summary))
+    #expect(decision["summary_is_truncated"] == .bool(true))
+    #expect(decision["origin"] == .string("marked"))
+    #expect(decision["created_at"] == .string(Date(timeIntervalSince1970: 34).ISO8601Format()))
+    #expect(decision["source"]?.objectValue?["kind"] == .string("artifact"))
+    #expect(
+        decision["source"]?.objectValue?["artifact_id"]
+            == .string(fixture.populatedResume.currentPlan!.artifact.id.rawValue))
+
+    let todos = try #require(fields["open_todos"]?.objectValue)
+    let todo = try #require(todos["entries"]?.arrayValue?.first?.objectValue)
+    #expect(todos["has_more"] == .bool(false))
+    #expect(todo["source"]?.objectValue?["kind"] == .string("session"))
+    #expect(todo["source"]?.objectValue?["session_id"] == .string(fixture.session.id.rawValue))
+    #expect(todo["summary_is_truncated"] == nil)
+    #expect(fields["open_questions"]?.objectValue?["has_more"] == .bool(true))
+}
+
 @Test("message entries retain their canonical kinds and text fallback is concise")
 func routerMapsConversationKinds() async throws {
     let fixture = RouterFixture()
@@ -37,9 +96,19 @@ func routerOmitsUnavailableFields() async throws {
     #expect(project.structuredContent?.objectValue?["workspace_path_is_truncated"] == nil)
     #expect(project.structuredContent?.objectValue?["canonical_remote_is_truncated"] == nil)
     let resume = try await router.call(.init(name: "context.resume"))
-    #expect(resume.structuredContent?.objectValue?["latest_session"] == nil)
-    #expect(resume.structuredContent?.objectValue?["last_activity_at"] == nil)
-    #expect(resume.structuredContent?.objectValue?["last_agent_provider"] == nil)
+    let resumeFields = try #require(resume.structuredContent?.objectValue)
+    #expect(resumeFields["last_activity_at"] == nil)
+    #expect(resumeFields["last_device"] == nil)
+    #expect(resumeFields["last_agent_provider"] == nil)
+    #expect(resumeFields["recent_session"] == nil)
+    #expect(resumeFields["current_plan"] == nil)
+    #expect(resumeFields["latest_brainstorm"] == nil)
+    #expect(resumeFields["relevant_graphs"] == .array([]))
+    for collectionName in ["recent_decisions", "open_todos", "open_questions"] {
+        #expect(
+            resumeFields[collectionName]
+                == .object(["entries": .array([]), "has_more": .bool(false)]))
+    }
     let artifacts = try await router.call(.init(name: "context.list_artifacts"))
     #expect(
         artifacts.structuredContent?.objectValue?["artifacts"]?.arrayValue?.first?.objectValue?[

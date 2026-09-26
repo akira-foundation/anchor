@@ -9,13 +9,14 @@ public struct ContextReadModelWriter: Sendable {
     public let database: SQLiteDatabase
     public let status: ContextReadModelStatusStore
     public let artifacts: SQLiteArtifactContextStore
+    public let presences: SQLiteDevicePresenceSnapshotStore
     public let observedWorkspace: ObservedWorkspace
 }
 
 public struct ContextReadModelReader: Sendable {
     public let databaseURL: URL
     public let currentProject: ResolveCurrentProjectAction
-    public let resume: BuildMinimalProjectResumeAction
+    public let resume: BuildProjectResumeAction
     public let search: SearchProjectContextAction
     public let listArtifacts: ListProjectArtifactsAction
     public let readArtifact: ReadProjectArtifactAction
@@ -40,6 +41,7 @@ public enum ContextReadModelAssembly {
         try await status.markRebuildRequired()
         let database = try SQLiteDatabase(fileURL: location.databaseURL)
         let artifacts = try await SQLiteArtifactContextStore(database: database)
+        let presences = try await SQLiteDevicePresenceSnapshotStore(database: database)
         let remoteOutcome = try await remoteReader.readRepositoryRemote(
             atDirectory: observed.workspaceURL)
         let remote: CanonicalRepositoryRemote?
@@ -55,7 +57,7 @@ public enum ContextReadModelAssembly {
                 workspaceURL: observed.workspaceURL))
         return ContextReadModelWriter(
             databaseURL: location.databaseURL, database: database, status: status,
-            artifacts: artifacts, observedWorkspace: observed)
+            artifacts: artifacts, presences: presences, observedWorkspace: observed)
     }
 
     public static func openReader(
@@ -75,8 +77,8 @@ public enum ContextReadModelAssembly {
         return ContextReadModelReader(
             databaseURL: location.databaseURL,
             currentProject: ResolveCurrentProjectAction(workspace: workspace, availability: status),
-            resume: BuildMinimalProjectResumeAction(
-                workspace: workspace, sessions: readers, availability: status),
+            resume: BuildProjectResumeAction(
+                workspace: workspace, resumes: readers, availability: status),
             search: SearchProjectContextAction(
                 workspace: workspace, search: readers, availability: status),
             listArtifacts: ListProjectArtifactsAction(

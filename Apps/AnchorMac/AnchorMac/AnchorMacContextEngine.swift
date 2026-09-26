@@ -145,6 +145,7 @@ final class AnchorMacContextEngine {
             sessionContext: sessionContext.recorder,
             artifactIndex: sessionContext.artifactIndex,
             contextStatus: readModel.status,
+            presenceSnapshot: readModel.presences,
             initialRefusals: initialRefusals
         )
 

@@ -17,8 +17,11 @@ struct ContextActionAvailabilityTests {
                 )
                 .perform(ProjectContextRequest())
             case 1:
-                _ = try await BuildMinimalProjectResumeAction(
-                    workspace: fixture, sessions: fixture, availability: availability
+                _ = try await BuildProjectResumeAction(
+                    workspace: fixture,
+                    resumes: ProjectResumeReaderSpy(
+                        resume: ProjectResume(project: fixture.project)),
+                    availability: availability
                 )
                 .perform(ProjectContextRequest())
             case 2:

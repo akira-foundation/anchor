@@ -3,11 +3,17 @@ import AnchorPersistence
 import Foundation
 
 public enum SQLiteKnowledgeStoreFailure: Error, Sendable, Equatable {
+    case malformedEntryRecord
+    case invalidSource(KnowledgeEntryID)
     case invalidSupportingMessageIdentifiers(KnowledgeEntryID)
 }
 
 public struct SQLiteKnowledgeStore: KnowledgeStore {
     private let database: SQLiteDatabase
+
+    public init(existingDatabase: SQLiteDatabase) {
+        database = existingDatabase
+    }
 
     public init(database: SQLiteDatabase) async throws {
         self.database = database
@@ -68,11 +74,48 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
             [.text(projectID.rawValue)]
         )
 
-        return try rows.reduce(into: []) { entries, row in
-            guard let entry = try Self.entry(from: row) else { return }
+        return try rows.map(Self.entry)
+    }
 
-            entries.append(entry)
-        }
+    public func loadCurrentEntries(
+        forProject projectID: ProjectID, kind: KnowledgeEntryKind, limit: Int
+    ) async throws -> (entries: [KnowledgeEntry], hasMore: Bool) {
+        let rows = try await database.run(
+            """
+            SELECT id, project_id, kind, summary_text, source, source_content_hash,
+                   origin, supporting_message_ids, state, created_at
+            FROM knowledge_entries
+            WHERE project_id = ? AND kind = ? AND state = ?
+            ORDER BY created_at DESC, id ASC
+            LIMIT ?;
+            """,
+            [
+                .text(projectID.rawValue), .text(kind.rawValue),
+                .text(KnowledgeEntryState.current.rawValue),
+                .integer(Int64(max(0, limit)) + 1),
+            ])
+        let decodedEntries = try rows.map(Self.entry)
+        return (
+            entries: Array(decodedEntries.prefix(max(0, limit))),
+            hasMore: decodedEntries.count > max(0, limit)
+        )
+    }
+
+    public func loadLatestCurrentEntryDate(
+        forProject projectID: ProjectID
+    ) async throws -> Date? {
+        let rows = try await database.run(
+            """
+            SELECT created_at FROM knowledge_entries
+            WHERE project_id = ? AND state = ?
+            ORDER BY created_at DESC, id ASC
+            LIMIT 1;
+            """,
+            [.text(projectID.rawValue), .text(KnowledgeEntryState.current.rawValue)])
+        guard let row = rows.first else { return nil }
+        guard let createdAt = row["created_at"]?.integer
+        else { throw SQLiteKnowledgeStoreFailure.malformedEntryRecord }
+        return Date(timeIntervalSince1970: TimeInterval(createdAt))
     }
 
     private static func stateFilter(_ includingSuperseded: Bool) -> String {
@@ -122,18 +165,23 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
         String(decoding: try JSONEncoder().encode(supportingMessageIDs), as: UTF8.self)
     }
 
-    private static func entry(from row: [String: SQLiteValue]) throws -> KnowledgeEntry? {
-        guard let identifier = row["id"]?.text.flatMap(KnowledgeEntryID.init(rawValue:)),
-            let projectID = row["project_id"]?.text.flatMap(ProjectID.init(rawValue:)),
+    private static func entry(from row: [String: SQLiteValue]) throws -> KnowledgeEntry {
+        guard let identifier = row["id"]?.text.flatMap(KnowledgeEntryID.init(rawValue:)) else {
+            throw SQLiteKnowledgeStoreFailure.malformedEntryRecord
+        }
+        guard let projectID = row["project_id"]?.text.flatMap(ProjectID.init(rawValue:)),
             let kind = row["kind"]?.text.flatMap(KnowledgeEntryKind.init(rawValue:)),
             let summaryText = row["summary_text"]?.text,
-            let source = row["source"]?.text.flatMap(Self.decodedSource(from:)),
             let contentHash = row["source_content_hash"]?.text.flatMap(ContentHash.init(rawValue:)),
             let origin = row["origin"]?.text.flatMap(KnowledgeEntryOrigin.init(rawValue:)),
             let encodedSupportingMessageIDs = row["supporting_message_ids"]?.text,
             let state = row["state"]?.text.flatMap(KnowledgeEntryState.init(rawValue:)),
             let createdAt = row["created_at"]?.integer
-        else { return nil }
+        else { throw SQLiteKnowledgeStoreFailure.malformedEntryRecord }
+
+        guard let encodedSource = row["source"]?.text,
+            let source = Self.decodedSource(from: encodedSource)
+        else { throw SQLiteKnowledgeStoreFailure.invalidSource(identifier) }
 
         let supportingMessageIDs: [MessageID]
         do {

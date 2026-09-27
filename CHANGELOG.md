@@ -4,6 +4,9 @@
 
 ### Changed
 
+- `context.resume` now replaces `latest_session` with `recent_session` and adds
+  compact persisted plan, brainstorm, Graphify, decision, todo, question, and
+  device-presence context.
 - Context query reader protocols now require a `ContextCursorBinding` when
   paginating. Driver implementations and direct callers must pass the authorized
   workspace path and current read-model generation; version 1 cursors are no

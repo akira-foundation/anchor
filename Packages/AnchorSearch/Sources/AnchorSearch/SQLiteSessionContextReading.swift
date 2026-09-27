@@ -82,6 +82,21 @@ extension SQLiteContextSearch {
         return try sessionRows.first.map(Self.sessionRecord)
     }
 
+    public func loadMostRecentSession(
+        forProject projectID: ProjectID
+    ) async throws -> SessionContextRecord? {
+        let sessionRows = try await database.run(
+            """
+            \(Self.sessionSelection)
+            FROM context_sessions
+            WHERE project_id = ?
+            ORDER BY updated_at DESC, session_id ASC
+            LIMIT 1;
+            """,
+            [.text(projectID.rawValue)])
+        return try sessionRows.first.map(Self.sessionRecord)
+    }
+
     public func loadConversationEntries(
         inSession sessionID: SessionID,
         page: ContextPageRequest,

@@ -18,6 +18,7 @@ public enum ContextEngineAssembly {
         sessionContext: SessionContextRecording? = nil,
         artifactIndex: (any ArtifactContextIndexing)? = nil,
         contextStatus: ContextReadModelStatusStore? = nil,
+        presenceSnapshot: (any DevicePresenceSnapshotStore)? = nil,
         initialRefusals: [String] = []
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
@@ -42,7 +43,7 @@ public enum ContextEngineAssembly {
                 operationJournal: operationJournal
             ),
             synchronizer: makeSynchronizer(storage: storage, operations: operationJournal),
-            presences: makePresences(storage: storage),
+            presences: makePresences(storage: storage, snapshot: presenceSnapshot),
             sessionContext: sessionContext,
             artifactIndex: artifactIndex,
             contextStatus: contextStatus,
@@ -111,7 +112,10 @@ public enum ContextEngineAssembly {
                 sessionsOnDisk(
                     forProject: observed.projectID, inWorkspaceAt: observed.workspaceURL,
                     sessionFileIndex: sessionFileIndex)
-            }, status: writer.status)
+            },
+            presences: ReadModelDevicePresenceRegistry(
+                snapshot: writer.presences, remote: makeRemotePresences(storage: storage)),
+            status: writer.status)
     }
 
     private static func configuredInference(
@@ -195,11 +199,20 @@ public enum ContextEngineAssembly {
     }
 
     private static func makePresences(
-        storage: AssembledContextStorage
+        storage: AssembledContextStorage,
+        snapshot: (any DevicePresenceSnapshotStore)?
     ) -> any DevicePresenceRegistry {
-        guard let remote = storage.remote else { return DeferredDevicePresenceRegistry() }
+        guard let snapshot else {
+            return makeRemotePresences(storage: storage) ?? DeferredDevicePresenceRegistry()
+        }
+        return ReadModelDevicePresenceRegistry(
+            snapshot: snapshot, remote: makeRemotePresences(storage: storage))
+    }
 
-        return StoredDevicePresenceRegistry(storage: remote)
+    private static func makeRemotePresences(
+        storage: AssembledContextStorage
+    ) -> (any DevicePresenceRegistry)? {
+        storage.remote.map(StoredDevicePresenceRegistry.init(storage:))
     }
 
     private static func makeRevisionStore(over storage: any StorageProvider) -> RevisionStore {

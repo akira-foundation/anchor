@@ -1,5 +1,6 @@
 import AnchorApplication
 import AnchorDomain
+import AnchorKnowledge
 import AnchorPersistence
 import AnchorProvider
 import AnchorSearch
@@ -69,9 +70,11 @@ struct ContextAssemblyFixture {
     }
     func rebuilder(
         writer: ContextReadModelWriter, storage: AssembledContextStorage,
-        failing: Bool = false
+        failing: Bool = false,
+        presenceRemote: any DevicePresenceRegistry = DeferredDevicePresenceRegistry()
     ) async throws -> ContextReadModelRebuilder {
         let contentStore = StoredArtifactContentStore(storage: storage.local)
+        _ = try await SQLiteKnowledgeStore(database: writer.database)
         return ContextReadModelRebuilder(
             projectID: observed.projectID,
             discoverer: SuperpowersArtifactProvider(workspaceURL: observed.workspaceURL),
@@ -87,7 +90,10 @@ struct ContextAssemblyFixture {
                         from: transcript, forProject: observed.projectID)
                 else { return [] }
                 return [session]
-            }, status: writer.status)
+            },
+            presences: ReadModelDevicePresenceRegistry(
+                snapshot: writer.presences, remote: presenceRemote),
+            status: writer.status)
     }
     func seed() async throws -> RecordedArtifactRevision {
         let planURL = observed.workspaceURL.appending(path: "docs/superpowers/plans/current.md")

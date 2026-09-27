@@ -12,6 +12,65 @@ import Testing
 
 @Suite("Persistent context read-model assembly")
 struct ContextReadModelAssemblyTests {
+    @Test("opening the writer migrates and exposes the presence snapshot")
+    func writerExposesPresenceSnapshot() async throws {
+        let fixture = try ContextAssemblyFixture()
+        defer { fixture.remove() }
+        let writer = try await fixture.writer()
+        let presence = DevicePresence(
+            projectID: fixture.observed.projectID,
+            deviceID: DeviceID.derived(fromSeed: "writer-presence"),
+            lastSeenAt: Date(timeIntervalSince1970: 50))
+
+        try await writer.presences.recordPresence(presence)
+
+        #expect(
+            try await writer.presences.presences(onProject: fixture.observed.projectID)
+                == [presence])
+    }
+
+    @Test("rebuild refreshes remote presence into the durable snapshot")
+    func rebuildRefreshesRemotePresence() async throws {
+        let fixture = try ContextAssemblyFixture()
+        defer { fixture.remove() }
+        let writer = try await fixture.writer()
+        let storage = await fixture.storage()
+        let remotePresence = DevicePresence(
+            projectID: fixture.observed.projectID,
+            deviceID: DeviceID.derived(fromSeed: "remote-presence"),
+            lastSeenAt: Date(timeIntervalSince1970: 60))
+        let rebuilder = try await fixture.rebuilder(
+            writer: writer, storage: storage,
+            presenceRemote: RebuildPresenceRegistry(presences: [remotePresence]))
+
+        _ = try await rebuilder.rebuild()
+
+        #expect(
+            try await writer.presences.presences(onProject: fixture.observed.projectID)
+                == [remotePresence])
+    }
+
+    @Test("failed remote presence refresh preserves cached rows and completes rebuild")
+    func rebuildPreservesPresenceWhenRemoteFails() async throws {
+        let fixture = try ContextAssemblyFixture()
+        defer { fixture.remove() }
+        let writer = try await fixture.writer()
+        let storage = await fixture.storage()
+        let cachedPresence = DevicePresence(
+            projectID: fixture.observed.projectID,
+            deviceID: DeviceID.derived(fromSeed: "cached-presence"),
+            lastSeenAt: Date(timeIntervalSince1970: 70))
+        try await writer.presences.recordPresence(cachedPresence)
+        let rebuilder = try await fixture.rebuilder(
+            writer: writer, storage: storage,
+            presenceRemote: RebuildPresenceRegistry(fails: true))
+
+        #expect(try await rebuilder.rebuild() == 1)
+        #expect(
+            try await writer.presences.presences(onProject: fixture.observed.projectID)
+                == [cachedPresence])
+    }
+
     @Test("the app and helper resolve the same context database URL")
     func appAndHelperShareTheContextDatabaseLocation() async throws {
         let fixture = try ContextAssemblyFixture()
@@ -89,7 +148,7 @@ struct ContextReadModelAssemblyTests {
             try #require(ReadSessionMessagesRequest(sessionID: fixture.transcript.session.id)))
         #expect(entries.records == fixture.transcript.entries)
         let resume = try await reopened.resume.perform(ProjectContextRequest())
-        #expect(resume.latestSession == fixture.transcript.session)
+        #expect(resume.recentSession?.session == fixture.transcript.session)
     }
 
     @Test("a stale read model is refused until an idempotent rebuild completes")
@@ -163,5 +222,24 @@ struct ContextReadModelAssemblyTests {
         await #expect(throws: ContextQueryFailure.contextUnavailable) {
             try await reader.currentProject.perform(ProjectContextRequest())
         }
+    }
+}
+
+private struct RebuildPresenceRegistry: DevicePresenceRegistry {
+    enum Failure: Error { case unavailable }
+
+    let returnedPresences: [DevicePresence]
+    let fails: Bool
+
+    init(presences: [DevicePresence] = [], fails: Bool = false) {
+        returnedPresences = presences
+        self.fails = fails
+    }
+
+    func announcePresence(_ presence: DevicePresence) async throws {}
+
+    func presences(onProject projectID: ProjectID) async throws -> [DevicePresence] {
+        if fails { throw Failure.unavailable }
+        return returnedPresences
     }
 }

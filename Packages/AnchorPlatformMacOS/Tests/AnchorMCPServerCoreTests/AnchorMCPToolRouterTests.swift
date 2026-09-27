@@ -12,7 +12,7 @@ func routerDispatchesEightQueries() async throws {
     let router = AnchorMCPToolRouter(actions: fixture.actions)
     let calls: [(String, [String: Value], String, String)] = [
         ("context.current_project", [:], "project_id", "project"),
-        ("context.resume", [:], "project", "sessions"),
+        ("context.resume", [:], "project", "resume"),
         ("context.search", ["text": .string("needle")], "hits", "search"),
         ("context.list_artifacts", [:], "artifacts", "artifacts"),
         (
@@ -105,12 +105,13 @@ func serverServesToolsOverInMemoryTransport() async throws {
 
 actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading,
     ProjectContextSearching, ArtifactContextReading, ArtifactRevisionContentReading,
-    SessionContextReading, ProjectConversationReading
+    SessionContextReading, ProjectConversationReading, ProjectResumeReading
 {
     nonisolated let project: ProjectContext
     nonisolated let artifact: Artifact
     nonisolated let revision: ArtifactRevision
     nonisolated let session: AgentSession
+    nonisolated let populatedResume: ProjectResume
     private let failure: ContextQueryFailure?
     private let includesSession: Bool
     private let messageContent: String
@@ -143,6 +144,37 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
         session = AgentSession(
             id: SessionID(), projectID: projectID, provider: .codex,
             startedAt: Date(timeIntervalSince1970: 10), updatedAt: Date(timeIntervalSince1970: 20))
+        let plan = Self.resumeArtifact(
+            seed: "router-plan", projectID: projectID, provider: .superpowers,
+            name: "docs/superpowers/plans/current.md", revisedAt: 31)
+        let brainstorm = Self.resumeArtifact(
+            seed: "router-brainstorm", projectID: projectID, provider: .superpowers,
+            name: ".superpowers/brainstorm/current.md", revisedAt: 32)
+        let graph = Self.resumeArtifact(
+            seed: "router-graph", projectID: projectID, provider: .graphify,
+            name: "graphs/current.json", revisedAt: 33)
+        let decision = Self.resumeKnowledge(
+            seed: "router-decision", projectID: projectID, kind: .decision,
+            summary: String(repeating: "é", count: 300), source: .artifact(plan.artifact.id),
+            createdAt: 34)
+        let todo = Self.resumeKnowledge(
+            seed: "router-todo", projectID: projectID, kind: .todo,
+            summary: "Ship the compact resume", source: .session(session.id), createdAt: 35)
+        let question = Self.resumeKnowledge(
+            seed: "router-question", projectID: projectID, kind: .question,
+            summary: "What comes next?", source: .artifact(graph.artifact.id), createdAt: 36)
+        populatedResume = ProjectResume(
+            project: project,
+            recentSession: SessionContextRecord(
+                session: session, messageCount: 7, toolActivityCount: 3),
+            lastPresence: DevicePresence(
+                projectID: projectID, deviceID: DeviceID.derived(fromSeed: "router-device"),
+                lastSeenAt: Date(timeIntervalSince1970: 30)),
+            latestArtifactRevisionAt: Date(timeIntervalSince1970: 40),
+            latestKnowledgeEntryAt: Date(timeIntervalSince1970: 36),
+            currentPlan: plan, latestBrainstorm: brainstorm, relevantGraphs: [graph],
+            recentDecisions: [decision], openTodos: [todo], openQuestions: [question],
+            hasMoreDecisions: true, hasMoreTodos: false, hasMoreQuestions: true)
         self.failure = failure
         self.includesSession = includesSession
         self.messageContent = messageContent
@@ -155,8 +187,8 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
     nonisolated var actions: ContextQueryActions {
         ContextQueryActions(
             currentProject: ResolveCurrentProjectAction(workspace: self, availability: self),
-            resume: BuildMinimalProjectResumeAction(
-                workspace: self, sessions: self, availability: self),
+            resume: BuildProjectResumeAction(
+                workspace: self, resumes: self, availability: self),
             search: SearchProjectContextAction(workspace: self, search: self, availability: self),
             listArtifacts: ListProjectArtifactsAction(
                 workspace: self, artifacts: self, availability: self),
@@ -178,6 +210,12 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
     func loadAuthorizedProjectContext() async throws -> ProjectContext {
         operations.append("project")
         return project
+    }
+    func loadProjectResume(
+        for project: ProjectContext, limits: ProjectResumeLimits
+    ) async throws -> ProjectResume {
+        operations.append("resume")
+        return includesSession ? populatedResume : ProjectResume(project: project)
     }
     func searchContext(
         forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
@@ -232,16 +270,6 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
         return SessionContextRecord(session: session, messageCount: 1, toolActivityCount: 1)
     }
     func loadConversationEntries(
-        inSession sessionID: SessionID, page: ContextPageRequest,
-        binding: ContextCursorBinding
-    )
-        async throws -> ContextPage<ConversationEntry>
-    {
-        return try await loadConversationEntries(
-            inSession: sessionID, forProject: project.projectID, page: page,
-            binding: binding)
-    }
-    func loadConversationEntries(
         inSession sessionID: SessionID, forProject projectID: ProjectID,
         page: ContextPageRequest, binding: ContextCursorBinding
     ) async throws -> ContextPage<ConversationEntry> {
@@ -260,4 +288,5 @@ actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading
                         timestamp: Date(timeIntervalSince1970: 13))),
             ], nextCursor: nil)
     }
+
 }

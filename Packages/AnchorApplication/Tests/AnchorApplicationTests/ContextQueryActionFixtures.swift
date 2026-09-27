@@ -148,3 +148,26 @@ actor QueryContentSpy: ArtifactRevisionContentReading {
         return bytes
     }
 }
+
+actor ProjectResumeReaderSpy: ProjectResumeReading {
+    enum Failure: Error { case driver }
+
+    private let resume: ProjectResume
+    private let failure: Failure?
+    private(set) var requestedProjects: [ProjectContext] = []
+    private(set) var requestedLimits: [ProjectResumeLimits] = []
+
+    init(resume: ProjectResume, failure: Failure? = nil) {
+        self.resume = resume
+        self.failure = failure
+    }
+
+    func loadProjectResume(
+        for project: ProjectContext, limits: ProjectResumeLimits
+    ) async throws -> ProjectResume {
+        requestedProjects.append(project)
+        requestedLimits.append(limits)
+        if let failure { throw failure }
+        return resume
+    }
+}

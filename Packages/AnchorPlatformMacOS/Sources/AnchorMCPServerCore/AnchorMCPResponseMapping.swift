@@ -35,6 +35,95 @@ extension AnchorMCPToolRouter {
         return .object(fields)
     }
 
+    func resumeFields(_ resume: ProjectResume) -> Value {
+        var fields: [String: Value] = [
+            "project": .object(projectFields(resume.project)),
+            "relevant_graphs": .array(resume.relevantGraphs.map(resumeArtifactFields)),
+            "recent_decisions": knowledgeCollectionFields(
+                resume.recentDecisions, hasMore: resume.hasMoreDecisions),
+            "open_todos": knowledgeCollectionFields(
+                resume.openTodos, hasMore: resume.hasMoreTodos),
+            "open_questions": knowledgeCollectionFields(
+                resume.openQuestions, hasMore: resume.hasMoreQuestions),
+        ]
+        if let timestamp = resume.lastActivityAt {
+            fields["last_activity_at"] = timestampValue(timestamp)
+        }
+        if let presence = resume.lastPresence {
+            fields["last_device"] = devicePresenceFields(presence)
+        }
+        if let provider = resume.lastAgentProvider {
+            fields["last_agent_provider"] = .string(provider.rawValue)
+        }
+        if let session = resume.recentSession {
+            fields["recent_session"] = sessionRecordFields(session)
+        }
+        if let plan = resume.currentPlan {
+            fields["current_plan"] = resumeArtifactFields(plan)
+        }
+        if let brainstorm = resume.latestBrainstorm {
+            fields["latest_brainstorm"] = resumeArtifactFields(brainstorm)
+        }
+        return .object(fields)
+    }
+
+    func devicePresenceFields(_ presence: DevicePresence) -> Value {
+        .object([
+            "device_id": .string(presence.deviceID.rawValue),
+            "last_seen_at": timestampValue(presence.lastSeenAt),
+        ])
+    }
+
+    func resumeArtifactFields(_ record: ArtifactContextRecord) -> Value {
+        var fields: [String: Value] = [
+            "artifact_id": .string(record.artifact.id.rawValue)
+        ]
+        assignBoundedText(record.artifact.name, field: "name", fields: &fields)
+        if let revision = record.latestRevision {
+            fields["revision_id"] = .string(revision.id.rawValue)
+            fields["updated_at"] = timestampValue(revision.createdAt)
+        }
+        return .object(fields)
+    }
+
+    func knowledgeCollectionFields(
+        _ entries: [ProjectResumeKnowledgeEntry], hasMore: Bool
+    ) -> Value {
+        .object([
+            "entries": .array(entries.map(knowledgeEntryFields)),
+            "has_more": .bool(hasMore),
+        ])
+    }
+
+    func knowledgeEntryFields(_ entry: ProjectResumeKnowledgeEntry) -> Value {
+        var fields: [String: Value] = [
+            "knowledge_entry_id": .string(entry.id.rawValue),
+            "summary": .string(entry.summary),
+            "origin": .string(entry.origin.rawValue),
+            "created_at": timestampValue(entry.createdAt),
+            "source": knowledgeSourceFields(entry.source),
+        ]
+        if entry.summaryIsTruncated {
+            fields["summary_is_truncated"] = .bool(true)
+        }
+        return .object(fields)
+    }
+
+    func knowledgeSourceFields(_ source: KnowledgeEntrySource) -> Value {
+        switch source {
+        case .artifact(let artifactID):
+            .object([
+                "kind": .string("artifact"),
+                "artifact_id": .string(artifactID.rawValue),
+            ])
+        case .session(let sessionID):
+            .object([
+                "kind": .string("session"),
+                "session_id": .string(sessionID.rawValue),
+            ])
+        }
+    }
+
     func sessionFields(_ session: AgentSession) -> [String: Value] {
         var fields: [String: Value] = [
             "session_id": .string(session.id.rawValue),

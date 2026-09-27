@@ -11,6 +11,7 @@ public struct ContextReadModelRebuilder: Sendable {
     private let transcripts: any ProjectTranscriptsReplacing
     private let canonicalSessions:
         @Sendable () async throws -> [(artifact: Artifact, content: Data)]
+    private let presences: any DevicePresenceRegistry
     private let status: ContextReadModelStatusStore
 
     public init(
@@ -19,6 +20,7 @@ public struct ContextReadModelRebuilder: Sendable {
         artifacts: any ArtifactContextReplacing, transcripts: any ProjectTranscriptsReplacing,
         canonicalSessions:
             @escaping @Sendable () async throws -> [(artifact: Artifact, content: Data)],
+        presences: any DevicePresenceRegistry,
         status: ContextReadModelStatusStore
     ) {
         self.projectID = projectID
@@ -27,6 +29,7 @@ public struct ContextReadModelRebuilder: Sendable {
         self.artifacts = artifacts
         self.transcripts = transcripts
         self.canonicalSessions = canonicalSessions
+        self.presences = presences
         self.status = status
     }
 
@@ -50,6 +53,7 @@ public struct ContextReadModelRebuilder: Sendable {
             }
             try await artifacts.replaceArtifactRevisions(revisions, forProject: projectID)
             try await transcripts.replaceTranscripts(batch, forProject: projectID)
+            _ = try await presences.presences(onProject: projectID)
             indexedSessions = batch.count
         } catch {
             try await status.completeUpdate(update, succeeded: false)

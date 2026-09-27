@@ -5,7 +5,7 @@ import MCP
 
 public struct ContextQueryActions: Sendable {
     public let currentProject: ResolveCurrentProjectAction
-    public let resume: BuildMinimalProjectResumeAction
+    public let resume: BuildProjectResumeAction
     public let search: SearchProjectContextAction
     public let listArtifacts: ListProjectArtifactsAction
     public let readArtifact: ReadProjectArtifactAction
@@ -14,7 +14,7 @@ public struct ContextQueryActions: Sendable {
     public let readMessages: ReadSessionMessagesAction
 
     public init(
-        currentProject: ResolveCurrentProjectAction, resume: BuildMinimalProjectResumeAction,
+        currentProject: ResolveCurrentProjectAction, resume: BuildProjectResumeAction,
         search: SearchProjectContextAction, listArtifacts: ListProjectArtifactsAction,
         readArtifact: ReadProjectArtifactAction, listSessions: ListProjectSessionsAction,
         readSession: ReadProjectSessionAction, readMessages: ReadSessionMessagesAction
@@ -46,17 +46,7 @@ public struct AnchorMCPToolRouter: Sendable {
                     .object(projectFields(project)), summary: "Project context available.")
             case "context.resume":
                 let resume = try await actions.resume.perform(ProjectContextRequest())
-                var fields: [String: Value] = ["project": .object(projectFields(resume.project))]
-                if let timestamp = resume.lastActivityAt {
-                    fields["last_activity_at"] = timestampValue(timestamp)
-                }
-                if let provider = resume.lastAgentProvider {
-                    fields["last_agent_provider"] = .string(provider.rawValue)
-                }
-                if let session = resume.latestSession {
-                    fields["latest_session"] = .object(sessionFields(session))
-                }
-                return response(.object(fields), summary: "Project resume available.")
+                return response(resumeFields(resume), summary: "Project resume available.")
             case "context.search":
                 guard
                     let request = SearchProjectContextRequest(

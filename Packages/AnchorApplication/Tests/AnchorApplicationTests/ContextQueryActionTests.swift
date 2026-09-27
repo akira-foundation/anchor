@@ -52,24 +52,6 @@ struct ContextQueryActionTests {
         #expect(third.nextCursor == nil)
     }
 
-    @Test("minimal resume uses the newest session and no invented fields")
-    func minimalResumeUsesNewestKnownSession() async throws {
-        let fixture = try ContextQueryFixture()
-        let resume = try await BuildMinimalProjectResumeAction(
-            workspace: fixture, sessions: fixture, availability: fixture
-        ).perform(ProjectContextRequest())
-        #expect(resume.latestSession == fixture.session)
-        #expect(resume.lastActivityAt == Date(timeIntervalSince1970: 20))
-        #expect(resume.lastAgentProvider == .codex)
-        let empty = try ContextQueryFixture(hasSession: false)
-        let emptyResume = try await BuildMinimalProjectResumeAction(
-            workspace: empty, sessions: empty, availability: empty
-        ).perform(ProjectContextRequest())
-        #expect(emptyResume.latestSession == nil)
-        #expect(emptyResume.lastActivityAt == nil)
-        #expect(emptyResume.lastAgentProvider == nil)
-    }
-
     @Test("message listing rejects limits above two hundred")
     func messageListingRejectsOversizedPage() async throws {
         let fixture = try ContextQueryFixture()

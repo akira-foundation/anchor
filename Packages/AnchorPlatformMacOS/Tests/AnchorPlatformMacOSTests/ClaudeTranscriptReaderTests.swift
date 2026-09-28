@@ -68,6 +68,51 @@ struct ClaudeTranscriptReaderTests {
         #expect(Set(transcripts.map(\.session.id)) == Set(expected))
     }
 
+    @Test("the same external message identifier is distinct in different sessions")
+    func theSameExternalMessageIdentifierIsDistinctInDifferentSessions() throws {
+        let sharedIdentifier = "64a83c13-12b4-4f1d-b8ec-ef08727156ca"
+        let text = [
+            userLine(
+                session: firstSession, uuid: sharedIdentifier,
+                at: "2026-08-08T18:20:24.411Z", saying: "first"),
+            userLine(
+                session: secondSession, uuid: sharedIdentifier,
+                at: "2026-08-09T10:00:00.000Z", saying: "second"),
+        ].joined(separator: "\n")
+
+        let identifiers = reader.transcripts(
+            inLineDelimitedJSON: text, forProject: projectID
+        ).flatMap(\.messages).map(\.id)
+
+        #expect(identifiers.count == 2)
+        #expect(Set(identifiers).count == 2)
+    }
+
+    @Test("replayed conversation entries appear once")
+    func replayedConversationEntriesAppearOnce() throws {
+        let messageIdentifier = "64a83c13-12b4-4f1d-b8ec-ef08727156ca"
+        let message = userLine(
+            session: firstSession, uuid: messageIdentifier,
+            at: "2026-08-08T18:20:24.411Z", saying: "once")
+        let assistant = assistantLine(
+            session: firstSession, uuid: "23281421-1563-4c81-bad0-4ac111c97a30",
+            at: "2026-08-08T18:20:30.000Z",
+            blocks: [
+                ["type": "text", "text": "done"],
+                [
+                    "type": "tool_use", "id": "toolu_replayed", "name": "Bash",
+                    "input": ["command": "pwd"],
+                ],
+            ])
+        let text = [message, assistant, message, assistant].joined(separator: "\n")
+
+        let transcript = try #require(
+            reader.transcripts(inLineDelimitedJSON: text, forProject: projectID).first)
+
+        #expect(transcript.messages.map(\.content) == ["once", "done"])
+        #expect(transcript.toolActivities.count == 1)
+    }
+
     @Test("tool traffic is not conversation")
     func toolTrafficIsNotConversation() throws {
         let text = [

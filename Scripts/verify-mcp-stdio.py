@@ -14,18 +14,15 @@ import unittest
 class ProbeFailure(Exception):
     pass
 
-
 REDACTED_SENTINEL = "[redacted:assigned-secret]"
 RAW_SECRET = "anchor-stdio-raw-secret-0123456789"
-TOOL_NAMES = {"context." + name for name in (
-    "current_project", "resume", "search", "list_artifacts", "get_artifact",
+TOOL_NAMES = {"context." + name for name in ("current_project", "resume", "search",
+    "list_artifacts", "get_artifact",
     "list_sessions", "get_session", "get_messages")}
-
 
 def require(condition, explanation):
     if not condition:
         raise ProbeFailure(explanation)
-
 
 class StdioProbe:
     def __init__(self, command, support, timeout):
@@ -153,15 +150,15 @@ def verify_protocol(command, workspace, support, timeout=10):
                 and os.path.realpath(project["workspace_path"]) == os.path.realpath(workspace),
                 "Missing fixture project evidence")
         hit = single_record(probe.tool("context.search", {"text": "checkpoint", "limit": 1}), "hits")
-        require("checkpoint" in hit.get("excerpt", "") and hit.get("provider") == "claude",
+        require("checkpoint" in hit.get("excerpt", "") and hit.get("provider") == "codex",
                 "Missing fixture search evidence")
         artifact = single_record(probe.tool("context.list_artifacts", {"limit": 1}), "artifacts")
-        require(artifact.get("name") == "stdio-plan.md" and artifact.get("artifact_id"),
+        require(artifact.get("name") == "stdio-latest-note.md" and artifact.get("artifact_id"),
                 "Missing fixture artifact evidence")
         probe.tool("context.get_artifact", {"artifact_id": artifact["artifact_id"], "byte_limit": 32},
                    error_code="context_unavailable")
         session = single_record(probe.tool("context.list_sessions", {"limit": 1}), "sessions")
-        require(session.get("provider") == "claude" and session.get("message_count") == 1
+        require(session.get("provider") == "codex" and session.get("message_count") == 2
                 and session.get("tool_activity_count") == 1 and session.get("session_id")
                 and hit.get("session_id") == session["session_id"], "Missing fixture session evidence")
         first = probe.tool("context.get_messages", {"session_id": session["session_id"], "limit": 1})
@@ -171,12 +168,19 @@ def verify_protocol(command, workspace, support, timeout=10):
                 "Missing redacted fixture message evidence")
         require(isinstance(first.get("next_cursor"), str) and first["next_cursor"],
                 "Missing message pagination cursor")
-        second = probe.tool("context.get_messages", {"session_id": session["session_id"], "limit": 1,
-                                                     "cursor": first["next_cursor"]})
-        activity = single_record(second, "entries")
+        second = probe.tool("context.get_messages",
+            {"session_id": session["session_id"], "limit": 1, "cursor": first["next_cursor"]})
+        response = single_record(second, "entries")
+        require(response.get("entry_kind") == "message" and response.get("role") == "assistant"
+                and response.get("content") == "fixture ready" and
+                isinstance(second.get("next_cursor"), str) and second["next_cursor"],
+                "Missing fixture assistant message evidence")
+        third = probe.tool("context.get_messages",
+            {"session_id": session["session_id"], "limit": 1, "cursor": second["next_cursor"]})
+        activity = single_record(third, "entries")
         require(activity.get("entry_kind") == "tool_activity" and activity.get("tool_name") == "read"
-                and activity.get("invocation") == "inspect stdio-plan.md"
-                and activity.get("failed") is False and second.get("next_cursor") is None,
+                and activity.get("invocation") == "inspect stdio-latest-note.md"
+                and activity.get("failed") is False and third.get("next_cursor") is None,
                 "Missing terminal fixture tool activity evidence")
         probe.tool("context.list_sessions", {"cursor": "not-a-valid-cursor", "limit": 1},
                    error_code="invalid_cursor")
@@ -188,21 +192,22 @@ def verify_protocol(command, workspace, support, timeout=10):
 def self_tests():
     class ProbeTests(unittest.TestCase):
         def fixture_responses(self):
-            tool_names = ["current_project", "resume", "search", "list_artifacts",
-                          "get_artifact", "list_sessions", "get_session", "get_messages"]
+            tool_names = ["current_project", "resume", "search", "list_artifacts", "get_artifact",
+                          "list_sessions", "get_session", "get_messages"]
             content = [
                 {"name": "anchor-stdio-fixture", "project_id": "project", "workspace_path": "/fixture/workspace"},
-                {"hits": [{"session_id": "session", "provider": "claude", "excerpt": "stdio checkpoint ready"}]},
-                {"artifacts": [{"artifact_id": "artifact", "name": "stdio-plan.md"}]},
+                {"hits": [{"session_id": "session", "provider": "codex", "excerpt": "stdio checkpoint ready"}]},
+                {"artifacts": [{"artifact_id": "artifact", "name": "stdio-latest-note.md"}]},
                 {"code": "context_unavailable"},
-                {"sessions": [{"session_id": "session", "provider": "claude", "message_count": 1, "tool_activity_count": 1}]},
+                {"sessions": [{"session_id": "session", "provider": "codex", "message_count": 2, "tool_activity_count": 1}]},
                 {"entries": [{"entry_kind": "message", "role": "user", "content": "stdio checkpoint ready API_KEY=[redacted:assigned-secret]"}], "next_cursor": "next-page"},
-                {"entries": [{"entry_kind": "tool_activity", "tool_name": "read", "invocation": "inspect stdio-plan.md", "failed": False}]},
+                {"entries": [{"entry_kind": "message", "role": "assistant", "content": "fixture ready"}], "next_cursor": "next-page-2"},
+                {"entries": [{"entry_kind": "tool_activity", "tool_name": "read", "invocation": "inspect stdio-latest-note.md", "failed": False}]},
                 {"code": "invalid_cursor"},
             ]
-            return [{"protocolVersion": "2025-11-25", "serverInfo": {"name": "anchor"}},
-                    {"tools": [{"name": "context." + name} for name in tool_names]}] + [
-                        {"isError": index in (3, 7), "structuredContent": fields}
+            return [{"protocolVersion": "2025-11-25", "serverInfo": {"name": "anchor"}}, {
+                    "tools": [{"name": "context." + name} for name in tool_names]}] + [
+                        {"isError": index in (3, 8), "structuredContent": fields}
                         for index, fields in enumerate(content)]
 
         def probe(self, responses=None, stdout_suffix="", stderr="", exit_code=0, hang=False):
@@ -223,13 +228,14 @@ for line in sys.stdin:
     else:
         assert request['params']['protocolVersion'] == '2025-11-25'
     if request['method'] == 'tools/call':
-        names = ['current_project', 'search', 'list_artifacts', 'get_artifact',
-                 'list_sessions', 'get_messages', 'get_messages', 'list_sessions']
+        names = ['current_project', 'search', 'list_artifacts', 'get_artifact', 'list_sessions',
+                 'get_messages', 'get_messages', 'get_messages', 'list_sessions']
         assert request['params']['name'] == 'context.' + names[request['id'] - 3]
         arguments = request['params']['arguments']
-        if request['id'] in (4, 5, 7, 8, 9, 10): assert arguments['limit'] == 1
+        if request['id'] in (4, 5, 7, 8, 9, 10, 11): assert arguments['limit'] == 1
         if request['id'] == 9: assert arguments['cursor'] == 'next-page'
-        if request['id'] == 10: assert arguments['cursor'] == 'not-a-valid-cursor'
+        if request['id'] == 10: assert arguments['cursor'] == 'next-page-2'
+        if request['id'] == 11: assert arguments['cursor'] == 'not-a-valid-cursor'
     print(json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': responses.pop(0)}), flush=True)
 sys.stdout.write(sys.argv[2])
 sys.stderr.write(sys.argv[3])
@@ -278,9 +284,8 @@ sys.exit(int(sys.argv[4]))
                 with self.subTest(arguments=arguments), self.assertRaises(ProbeFailure):
                     self.probe(**arguments)
 
-    return unittest.TextTestRunner(verbosity=2).run(
-        unittest.defaultTestLoader.loadTestsFromTestCase(ProbeTests)).wasSuccessful()
-
+    return unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(
+        ProbeTests)).wasSuccessful()
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test"]:

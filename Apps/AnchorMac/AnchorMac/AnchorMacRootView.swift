@@ -17,6 +17,13 @@ struct AnchorMacRootView: View {
             Text(engineStatusText)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+
+            AgentIntegrationStatusView(
+                report: contextEngine.agentBootstrapReport,
+                isRunning: contextEngine.isAgentBootstrapRunning,
+                helperExecutableURL: contextEngine.helperExecutableURL,
+                workspaceURL: contextEngine.agentBootstrapWorkspaceURL,
+                retry: contextEngine.retryAgentBootstrap)
         }
         .frame(width: 320, alignment: .topLeading)
         .padding(16)

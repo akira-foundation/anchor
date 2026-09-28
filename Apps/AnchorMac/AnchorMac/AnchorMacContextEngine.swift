@@ -1,3 +1,4 @@
+import AnchorApplication
 import AnchorPersistence
 import AnchorPlatformAppleCloud
 import AnchorPlatformMacOS
@@ -25,22 +26,56 @@ final class AnchorMacContextEngine {
     static let iCloudContainerIdentifier = "iCloud.com.akira.anchor"
 
     private(set) var state: State = .idle
+    var agentBootstrapReport: AgentClientBootstrapReport? { agentBootstrapLifecycle?.report }
+    var isAgentBootstrapRunning: Bool { agentBootstrapLifecycle?.isRunning ?? false }
+    var agentBootstrapWorkspaceURL: URL? { agentBootstrapLifecycle?.workspaceURL }
+    var hasAgentBootstrapLifecycle: Bool { agentBootstrapLifecycle != nil }
+    let helperExecutableURL: URL
 
     private let supportDirectoryURL: URL?
+    private let agentBootstrapLifecycle: AgentClientBootstrapLifecycle?
+    private let startWorkspaceObservation:
+        (@MainActor @Sendable (ObservedWorkspace) async throws -> State)?
     private var coordinator: WorkspaceObservationCoordinator?
     private var assembledSessionContext: AssembledSessionContext?
     private var rebuildSessionContextIfInferenceBecameReady:
         ((KnowledgeInferenceStatus) async -> DiscoveredSessionContextRebuilder.Rebuild?)?
     private var isStarting = false
 
-    init(supportDirectoryURL: URL? = AnchorMacContextEngine.defaultSupportDirectoryURL) {
+    init(
+        supportDirectoryURL: URL?,
+        agentBootstrapLifecycle: AgentClientBootstrapLifecycle?,
+        helperExecutableURL: URL,
+        startWorkspaceObservation:
+            (@MainActor @Sendable (ObservedWorkspace) async throws -> State)? = nil
+    ) {
         self.supportDirectoryURL = supportDirectoryURL
+        self.agentBootstrapLifecycle = agentBootstrapLifecycle
+        self.helperExecutableURL = helperExecutableURL
+        self.startWorkspaceObservation = startWorkspaceObservation
     }
 
     static var defaultSupportDirectoryURL: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
             .appending(path: "Anchor")
+    }
+
+    static func configuredForProduction(
+        supportDirectoryURL: URL?, applicationBundleURL: URL
+    ) -> AnchorMacContextEngine {
+        let helperExecutableURL =
+            applicationBundleURL
+            .appending(path: "Contents/Helpers/AnchorMCPServer")
+        return AnchorMacContextEngine(
+            supportDirectoryURL: supportDirectoryURL,
+            agentBootstrapLifecycle: supportDirectoryURL.map {
+                AgentClientBootstrapLifecycle(
+                    coordinator: AgentClientBootstrapAssembly.makeCoordinator(
+                        supportDirectoryURL: $0),
+                    helperExecutableURL: helperExecutableURL)
+            },
+            helperExecutableURL: helperExecutableURL)
     }
 
     func start() async {
@@ -80,11 +115,21 @@ final class AnchorMacContextEngine {
     }
 
     func stop() async {
+        await agentBootstrapLifecycle?.stop()
         await coordinator?.stopObserving()
         coordinator = nil
         assembledSessionContext = nil
         rebuildSessionContextIfInferenceBecameReady = nil
         state = .idle
+    }
+
+    func retryAgentBootstrap() {
+        guard !isAgentBootstrapRunning, let supportDirectoryURL else { return }
+        let configuration = ObservedWorkspaceConfiguration(
+            fileURL: ObservedWorkspaceConfiguration.defaultFileURL(
+                inSupportDirectoryAt: supportDirectoryURL))
+        let observed = try? configuration.observedWorkspace()
+        agentBootstrapLifecycle?.start(workspaceURL: observed?.workspaceURL)
     }
 
     private func beginObserving() async throws {
@@ -99,6 +144,11 @@ final class AnchorMacContextEngine {
 
         guard let observed = try configuration.observedWorkspace() else {
             state = .noWorkspaceConfigured
+            return
+        }
+        agentBootstrapLifecycle?.start(workspaceURL: observed.workspaceURL)
+        if let startWorkspaceObservation {
+            state = try await startWorkspaceObservation(observed)
             return
         }
 

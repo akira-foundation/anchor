@@ -1,3 +1,6 @@
+import AnchorPlatformMacOS
+import Foundation
+
 @MainActor
 struct AnchorMacCompositionRoot {
     let applicationDisplayName: String
@@ -10,12 +13,16 @@ struct AnchorMacCompositionRoot {
         applicationDisplayName: String,
         applicationPurposeDescription: String,
         menuBarSymbolName: String,
-        contextEngine: AnchorMacContextEngine = AnchorMacContextEngine()
+        contextEngine: AnchorMacContextEngine? = nil
     ) {
         self.applicationDisplayName = applicationDisplayName
         self.applicationPurposeDescription = applicationPurposeDescription
         self.menuBarSymbolName = menuBarSymbolName
-        self.contextEngine = contextEngine
+        self.contextEngine =
+            contextEngine
+            ?? AnchorMacContextEngine.configuredForProduction(
+                supportDirectoryURL: AnchorMacContextEngine.defaultSupportDirectoryURL,
+                applicationBundleURL: Bundle.main.bundleURL)
     }
 
     func makeRootView() -> AnchorMacRootView {

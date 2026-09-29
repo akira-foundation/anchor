@@ -171,7 +171,7 @@ struct CodexToolActivityTests {
 
     private func metaLine(threadSource: String, withParent: Bool = false) -> String {
         var payload: [String: Any] = [
-            "session_id": session, "cwd": "/Users/kid/bu-country/bu-payment",
+            "id": session, "session_id": parent, "cwd": "/Users/kid/bu-country/bu-payment",
             "thread_source": threadSource,
         ]
         if withParent { payload["parent_thread_id"] = parent }
@@ -229,6 +229,7 @@ struct CodexToolActivityTests {
         let transcript = try #require(
             reader.transcript(inLineDelimitedJSON: text, forProject: projectID))
 
+        #expect(transcript.session.id == SessionID(rawValue: session))
         #expect(transcript.session.parentSessionID == SessionID(rawValue: parent))
         #expect(transcript.toolActivities.count == 1)
     }

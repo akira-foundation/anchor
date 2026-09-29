@@ -1,4 +1,5 @@
 import AnchorDomain
+import AnchorFoundation
 import AnchorProvider
 import Foundation
 
@@ -44,7 +45,8 @@ public struct ClaudeTranscriptReader: Sendable {
         from entries: [ClaudeEntry],
         forProject projectID: ProjectID
     ) -> AgentTranscript? {
-        let instants = entries.map(\.entry.timestamp)
+        let uniqueEntries = Self.entriesWithUniqueIdentifiers(from: entries)
+        let instants = uniqueEntries.map(\.entry.timestamp)
 
         guard let startedAt = instants.min(), let updatedAt = instants.max() else { return nil }
 
@@ -56,8 +58,18 @@ public struct ClaudeTranscriptReader: Sendable {
                 startedAt: startedAt,
                 updatedAt: updatedAt
             ),
-            entries: entries.map(\.entry)
+            entries: uniqueEntries.map(\.entry)
         )
+    }
+
+    private static func entriesWithUniqueIdentifiers(
+        from entries: [ClaudeEntry]
+    ) -> [ClaudeEntry] {
+        var recordedIdentifiers: Set<String> = []
+
+        return entries.filter {
+            recordedIdentifiers.insert($0.entry.orderingIdentifier).inserted
+        }
     }
 
     private func conversationMessage(fromLine line: Substring) -> ClaudeEntry? {
@@ -65,7 +77,7 @@ public struct ClaudeTranscriptReader: Sendable {
             let fields = record as? [String: Any],
             let role = ConversationRole(rawValue: fields["type"] as? String ?? ""),
             let sessionID = (fields["sessionId"] as? String).flatMap(SessionID.init(rawValue:)),
-            let messageID = (fields["uuid"] as? String).flatMap(MessageID.init(rawValue:)),
+            let externalIdentifier = fields["uuid"] as? String,
             let recordedAt = (fields["timestamp"] as? String).flatMap(Self.instant(from:))
         else { return nil }
 
@@ -77,7 +89,8 @@ public struct ClaudeTranscriptReader: Sendable {
             sessionID: sessionID,
             entry: .message(
                 ConversationMessage(
-                    id: messageID,
+                    id: MessageID.derived(
+                        fromSeed: "\(sessionID.rawValue)/\(externalIdentifier)"),
                     sessionID: sessionID,
                     role: role,
                     content: prose,

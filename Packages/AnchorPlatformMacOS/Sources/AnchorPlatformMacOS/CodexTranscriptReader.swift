@@ -21,7 +21,7 @@ public struct CodexTranscriptReader: Sendable {
         for line in text.split(separator: "\n") {
             guard let record = Self.record(from: line),
                 record.type == "session_meta",
-                let sessionID = (record.payload["session_id"] as? String)
+                let sessionID = ((record.payload["id"] ?? record.payload["session_id"]) as? String)
                     .flatMap(SessionID.init(rawValue:)),
                 let workingDirectory = record.payload["cwd"] as? String
             else { continue }

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Strict signed-helper protocol probe; --self-test checks the probe offline."""
 
-import copy
 import json
 import os
 import selectors
 import subprocess
 import sys
 import time
-import unittest
 
 
 class ProbeFailure(Exception):
@@ -18,7 +16,7 @@ REDACTED_SENTINEL = "[redacted:assigned-secret]"
 RAW_SECRET = "anchor-stdio-raw-secret-0123456789"
 TOOL_NAMES = {"context." + name for name in ("current_project", "resume", "search",
     "list_artifacts", "get_artifact",
-    "list_sessions", "get_session", "get_messages")}
+    "list_sessions", "get_session", "get_messages", "list_knowledge", "get_knowledge")}
 
 def require(condition, explanation):
     if not condition:
@@ -141,9 +139,9 @@ def verify_protocol(command, workspace, support, timeout=10):
                 "Unexpected server identity")
         probe.send("notifications/initialized", notification=True)
         tools = probe.send("tools/list").get("tools")
-        require(isinstance(tools, list) and len(tools) == 8
+        require(isinstance(tools, list) and len(tools) == 10
                 and {entry.get("name") for entry in tools} == TOOL_NAMES,
-                "Expected exactly the eight context tools")
+                "Expected exactly the ten context tools")
         project = probe.tool("context.current_project")
         require(project.get("name") == "anchor-stdio-fixture" and project.get("project_id")
                 and isinstance(project.get("workspace_path"), str)
@@ -182,6 +180,36 @@ def verify_protocol(command, workspace, support, timeout=10):
                 and activity.get("invocation") == "inspect stdio-latest-note.md"
                 and activity.get("failed") is False and third.get("next_cursor") is None,
                 "Missing terminal fixture tool activity evidence")
+        resume = probe.tool("context.resume")
+        decisions = resume.get("recent_decisions", {}).get("entries")
+        require(isinstance(decisions, list) and decisions and isinstance(decisions[0], dict)
+                and decisions[0].get("knowledge_entry_id"), "Missing resume decision evidence")
+        decision = decisions[0]
+        detail = probe.tool("context.get_knowledge",
+                            {"knowledge_entry_id": decision["knowledge_entry_id"]})
+        require(detail.get("knowledge_entry_id") == decision["knowledge_entry_id"]
+                and detail.get("summary") == "d" * 600
+                and detail.get("summary_is_truncated", False) is False,
+                "Missing untruncated knowledge detail")
+        require(detail.get("source_content_hash") ==
+                "c7c1b0af653d904909a3a8bf08d226bb30f89294d37037790d8a6b3bdacbfa02"
+                and message.get("message_id") and response.get("message_id")
+                and detail.get("supporting_message_ids") ==
+                [response["message_id"], message["message_id"]],
+                "Missing ordered knowledge source evidence")
+        knowledge = probe.tool("context.list_knowledge",
+                               {"kind": "decision", "origin": "marked", "limit": 1})
+        compact = single_record(knowledge, "entries")
+        require(compact.get("knowledge_entry_id") == decision["knowledge_entry_id"]
+                and compact.get("kind") == "decision" and compact.get("origin") == "marked"
+                and isinstance(compact.get("summary"), str)
+                and 0 < len(compact["summary"].encode("utf-8")) <= 512
+                and compact.get("summary_is_truncated") is True
+                and compact["summary"] == decision.get("summary")
+                and "source_content_hash" not in compact and "supporting_message_ids" not in compact,
+                "Missing compact bounded knowledge list evidence")
+        require(isinstance(knowledge.get("next_cursor"), str) and knowledge["next_cursor"],
+                "Missing knowledge pagination cursor")
         probe.tool("context.list_sessions", {"cursor": "not-a-valid-cursor", "limit": 1},
                    error_code="invalid_cursor")
         probe.finish()
@@ -190,102 +218,8 @@ def verify_protocol(command, workspace, support, timeout=10):
 
 
 def self_tests():
-    class ProbeTests(unittest.TestCase):
-        def fixture_responses(self):
-            tool_names = ["current_project", "resume", "search", "list_artifacts", "get_artifact",
-                          "list_sessions", "get_session", "get_messages"]
-            content = [
-                {"name": "anchor-stdio-fixture", "project_id": "project", "workspace_path": "/fixture/workspace"},
-                {"hits": [{"session_id": "session", "provider": "codex", "excerpt": "stdio checkpoint ready"}]},
-                {"artifacts": [{"artifact_id": "artifact", "name": "stdio-latest-note.md"}]},
-                {"code": "context_unavailable"},
-                {"sessions": [{"session_id": "session", "provider": "codex", "message_count": 2, "tool_activity_count": 1}]},
-                {"entries": [{"entry_kind": "message", "role": "user", "content": "stdio checkpoint ready API_KEY=[redacted:assigned-secret]"}], "next_cursor": "next-page"},
-                {"entries": [{"entry_kind": "message", "role": "assistant", "content": "fixture ready"}], "next_cursor": "next-page-2"},
-                {"entries": [{"entry_kind": "tool_activity", "tool_name": "read", "invocation": "inspect stdio-latest-note.md", "failed": False}]},
-                {"code": "invalid_cursor"},
-            ]
-            return [{"protocolVersion": "2025-11-25", "serverInfo": {"name": "anchor"}}, {
-                    "tools": [{"name": "context." + name} for name in tool_names]}] + [
-                        {"isError": index in (3, 8), "structuredContent": fields}
-                        for index, fields in enumerate(content)]
-
-        def probe(self, responses=None, stdout_suffix="", stderr="", exit_code=0, hang=False):
-            responses = self.fixture_responses() if responses is None else responses
-            program = """
-import json, os, sys, time
-responses = json.loads(sys.argv[1])
-assert os.environ['ANCHOR_MCP_TEST_SUPPORT_DIRECTORY'] == '/fixture'
-initialized = False
-for line in sys.stdin:
-    request = json.loads(line)
-    assert request['jsonrpc'] == '2.0'
-    if request['method'] == 'notifications/initialized':
-        initialized = True
-        continue
-    if request['method'] != 'initialize':
-        assert initialized
-    else:
-        assert request['params']['protocolVersion'] == '2025-11-25'
-    if request['method'] == 'tools/call':
-        names = ['current_project', 'search', 'list_artifacts', 'get_artifact', 'list_sessions',
-                 'get_messages', 'get_messages', 'get_messages', 'list_sessions']
-        assert request['params']['name'] == 'context.' + names[request['id'] - 3]
-        arguments = request['params']['arguments']
-        if request['id'] in (4, 5, 7, 8, 9, 10, 11): assert arguments['limit'] == 1
-        if request['id'] == 9: assert arguments['cursor'] == 'next-page'
-        if request['id'] == 10: assert arguments['cursor'] == 'next-page-2'
-        if request['id'] == 11: assert arguments['cursor'] == 'not-a-valid-cursor'
-    print(json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': responses.pop(0)}), flush=True)
-sys.stdout.write(sys.argv[2])
-sys.stderr.write(sys.argv[3])
-sys.stdout.flush()
-sys.stderr.flush()
-if sys.argv[5] == 'True': time.sleep(10)
-sys.exit(int(sys.argv[4]))
-"""
-            return verify_protocol(
-                [sys.executable, "-u", "-c", program, json.dumps(responses), stdout_suffix,
-                 stderr, str(exit_code), str(hang)], "/fixture/workspace", "/fixture", timeout=1)
-
-        def test_accepts_complete_paginated_exchange(self):
-            self.probe()
-
-        def test_accepts_equivalent_workspace_spelling(self):
-            responses = self.fixture_responses()
-            responses[2]["structuredContent"]["workspace_path"] = "/fixture/./workspace"
-            self.probe(responses)
-
-        def test_rejects_broken_protocol_evidence(self):
-            for response_index, key, replacement in [
-                (0, "protocolVersion", "old"), (1, "tools", []),
-                (2, "structuredContent", {}), (3, "structuredContent", {"hits": []}),
-                (5, "isError", False), (6, "structuredContent", {"sessions": []}),
-                (7, "structuredContent", {"entries": []}),
-                (7, "structuredContent", {"entries": [{}, {}]}),
-                (8, "structuredContent", {"entries": [{"entry_kind": "message"}]}),
-                (9, "structuredContent", {"code": "read_failed"}),
-            ]:
-                with self.subTest(response=response_index, key=key):
-                    responses = copy.deepcopy(self.fixture_responses())
-                    responses[response_index][key] = replacement
-                    with self.assertRaises(ProbeFailure):
-                        self.probe(responses)
-
-        def test_rejects_stdout_noise_and_unterminated_json(self):
-            for suffix in ("diagnostic\n", "[]\n", "{}", "{}\n", "\n"):
-                with self.subTest(suffix=suffix), self.assertRaises(ProbeFailure):
-                    self.probe(stdout_suffix=suffix)
-
-        def test_rejects_stderr_leaks_nonzero_exit_and_eof_hang(self):
-            for arguments in ({"stderr": "[redacted:assigned-secret]"},
-                              {"stderr": "anchor-stdio-raw-secret-0123456789"},
-                              {"exit_code": 3}, {"hang": True}):
-                with self.subTest(arguments=arguments), self.assertRaises(ProbeFailure):
-                    self.probe(**arguments)
-
-    return unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(
-        ProbeTests)).wasSuccessful()
+    test_path = os.path.join(os.path.dirname(__file__), "tests", "test_verify_mcp_stdio.py")
+    return subprocess.call([sys.executable, test_path]) == 0
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test"]:

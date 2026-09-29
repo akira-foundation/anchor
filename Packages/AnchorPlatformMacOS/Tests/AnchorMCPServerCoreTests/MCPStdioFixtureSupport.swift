@@ -25,13 +25,14 @@ extension MCPStdioFixture {
     func knowledgeEntry(
         seed: String, projectID: ProjectID, kind: KnowledgeEntryKind,
         summary: String? = nil, createdAt: TimeInterval,
-        source: KnowledgeEntrySource? = nil
+        source: KnowledgeEntrySource? = nil, supportingMessageIDs: [MessageID] = []
     ) -> KnowledgeEntry {
         KnowledgeEntry(
             id: KnowledgeEntryID.derived(fromSeed: seed), projectID: projectID, kind: kind,
             summaryText: summary ?? seed,
             source: source ?? .artifact(ArtifactID.derived(fromSeed: "\(seed)-source")),
             sourceContentHash: ContentHash.digest(of: Data(seed.utf8)), origin: .marked,
+            supportingMessageIDs: supportingMessageIDs,
             createdAt: date(createdAt))
     }
 

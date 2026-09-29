@@ -111,6 +111,8 @@ class ScaffoldMCPGateTests(unittest.TestCase):
         self.assertIn("security cms -D -i", calls)
         self.assertIn("codesign -d --entitlements - --xml", calls)
         self.assertIn("verify-mcp-stdio.py", calls)
+        self.assertIn("verify-mcp-stdio.py --self-test", calls)
+        self.assertEqual(calls.count("verify-mcp-stdio.py"), 2)
         self.assertIn("--filter AnchorMCPStdioFixtureTests", calls)
         self.assertEqual(calls.count("xcodebuild build"), 3)
         self.assertIn("platform=iOS Simulator,id=IPHONE-AVAILABLE", calls)

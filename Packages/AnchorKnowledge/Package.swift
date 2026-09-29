@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "AnchorKnowledge", targets: ["AnchorKnowledge"])
     ],
     dependencies: [
+        .package(path: "../AnchorApplication"),
         .package(path: "../AnchorDomain"),
         .package(path: "../AnchorIntelligence"),
         .package(path: "../AnchorPersistence"),
@@ -17,6 +18,7 @@ let package = Package(
         .target(
             name: "AnchorKnowledge",
             dependencies: [
+                .product(name: "AnchorApplication", package: "AnchorApplication"),
                 .product(name: "AnchorDomain", package: "AnchorDomain"),
                 .product(name: "AnchorPersistence", package: "AnchorPersistence"),
                 .product(name: "AnchorIntelligence", package: "AnchorIntelligence"),

@@ -1,3 +1,4 @@
+import AnchorApplication
 import AnchorDomain
 import AnchorPersistence
 import Foundation
@@ -8,8 +9,8 @@ public enum SQLiteKnowledgeStoreFailure: Error, Sendable, Equatable {
     case invalidSupportingMessageIdentifiers(KnowledgeEntryID)
 }
 
-public struct SQLiteKnowledgeStore: KnowledgeStore {
-    private let database: SQLiteDatabase
+public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
+    let database: SQLiteDatabase
 
     public init(existingDatabase: SQLiteDatabase) {
         database = existingDatabase
@@ -165,7 +166,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore {
         String(decoding: try JSONEncoder().encode(supportingMessageIDs), as: UTF8.self)
     }
 
-    private static func entry(from row: [String: SQLiteValue]) throws -> KnowledgeEntry {
+    static func entry(from row: [String: SQLiteValue]) throws -> KnowledgeEntry {
         guard let identifier = row["id"]?.text.flatMap(KnowledgeEntryID.init(rawValue:)) else {
             throw SQLiteKnowledgeStoreFailure.malformedEntryRecord
         }

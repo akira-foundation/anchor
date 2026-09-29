@@ -34,7 +34,8 @@ enum AnchorMCPServerMain {
                     currentProject: reader.currentProject, resume: reader.resume,
                     search: reader.search, listArtifacts: reader.listArtifacts,
                     readArtifact: reader.readArtifact, listSessions: reader.listSessions,
-                    readSession: reader.readSession, readMessages: reader.readMessages))
+                    readSession: reader.readSession, readMessages: reader.readMessages,
+                    listKnowledge: reader.listKnowledge, readKnowledge: reader.readKnowledge))
             try await server.runStandardInputOutput()
         } catch {
             FileHandle.standardError.write(Data("Anchor MCP server could not start.\n".utf8))

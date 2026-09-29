@@ -54,6 +54,20 @@ public struct AnchorMCPToolCatalog: Sendable {
                         "session_id": Self.string(minimumLength: 1)
                     ]) { _, replacement in replacement }, required: ["session_id"]),
                 annotations: readOnly),
+            Tool(
+                name: "context.list_knowledge", description: "List compact current knowledge.",
+                inputSchema: Self.schema(
+                    Self.pageProperties(maximum: 100).merging([
+                        "kind": Self.enumerated([
+                            "summary", "decision", "todo", "question", "risk", "architecture",
+                        ]),
+                        "origin": Self.enumerated(["classified", "marked", "inferred"]),
+                    ]) { _, replacement in replacement }), annotations: readOnly),
+            Tool(
+                name: "context.get_knowledge", description: "Read one complete knowledge entry.",
+                inputSchema: Self.schema(
+                    ["knowledge_entry_id": Self.string(minimumLength: 1)],
+                    required: ["knowledge_entry_id"]), annotations: readOnly),
         ]
     }
 
@@ -84,4 +98,10 @@ public struct AnchorMCPToolCatalog: Sendable {
         "type": .string("string"),
         "enum": .array(["claude", "codex", "superpowers", "graphify"].map(Value.string)),
     ])
+
+    private static func enumerated(_ options: [String]) -> Value {
+        .object([
+            "type": .string("string"), "enum": .array(options.map(Value.string)),
+        ])
+    }
 }

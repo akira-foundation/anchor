@@ -23,6 +23,8 @@ public struct ContextReadModelReader: Sendable {
     public let listSessions: ListProjectSessionsAction
     public let readSession: ReadProjectSessionAction
     public let readMessages: ReadSessionMessagesAction
+    public let listKnowledge: ListProjectKnowledgeAction
+    public let readKnowledge: ReadProjectKnowledgeAction
 }
 
 public enum ContextReadModelAssembly {
@@ -90,6 +92,10 @@ public enum ContextReadModelAssembly {
             readSession: ReadProjectSessionAction(
                 workspace: workspace, sessions: readers, availability: status),
             readMessages: ReadSessionMessagesAction(
-                workspace: workspace, entries: readers, availability: status))
+                workspace: workspace, entries: readers, availability: status),
+            listKnowledge: ListProjectKnowledgeAction(
+                workspace: workspace, knowledge: readers, availability: status),
+            readKnowledge: ReadProjectKnowledgeAction(
+                workspace: workspace, knowledge: readers, availability: status))
     }
 }

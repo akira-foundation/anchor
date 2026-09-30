@@ -3,7 +3,7 @@ import Testing
 
 @testable import AnchorPlatformMacOS
 
-@Suite("Agent command runner")
+@Suite("Agent command runner", .serialized)
 struct AgentCommandRunnerTests {
     @Test("runner removes inherited configuration overrides before launching a command")
     func removedEnvironmentKeysAreAbsent() async throws {

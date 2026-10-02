@@ -207,3 +207,67 @@ func routerPreservesFourByteUnicodeAtByteBoundary() async throws {
             == .string("a" + String(repeating: "\u{1F600}", count: 4_092) + "… [truncated]"))
     #expect(overlongMessage["content_is_truncated"] == .bool(true))
 }
+
+@Test("knowledge list maps compact entries and keeps summaries out of text content")
+func routerMapsCompactKnowledgePage() async throws {
+    let fixture = RouterFixture()
+    let response = try await AnchorMCPToolRouter(actions: fixture.actions).call(
+        .init(name: "context.list_knowledge"))
+    let fields = try #require(response.structuredContent?.objectValue)
+    #expect(fields["next_cursor"] == .string("knowledge-next"))
+    let entry = try #require(fields["entries"]?.arrayValue?.first?.objectValue)
+    #expect(
+        Set(entry.keys) == [
+            "knowledge_entry_id", "kind", "summary", "summary_is_truncated",
+            "origin", "created_at", "source",
+        ])
+    #expect(entry["knowledge_entry_id"] == .string(fixture.knowledgeEntry.id.rawValue))
+    #expect(entry["kind"] == .string("decision"))
+    #expect(entry["origin"] == .string("marked"))
+    #expect(entry["created_at"] == .string(fixture.knowledgeEntry.createdAt.ISO8601Format()))
+    #expect(entry["summary"]?.stringValue?.utf8.count ?? 0 <= 512)
+    #expect(entry["summary_is_truncated"] == .bool(true))
+    #expect(entry["source"]?.objectValue?["kind"] == .string("session"))
+    #expect(entry["source"]?.objectValue?["session_id"] == .string(fixture.session.id.rawValue))
+    #expect(
+        response.content == [
+            .text(text: "Knowledge entries available.", annotations: nil, _meta: nil)
+        ])
+    #expect(!String(describing: response.content).contains("fixture-secret"))
+}
+
+@Test("knowledge detail maps complete summary, source hash and ordered evidence")
+func routerMapsCompleteKnowledgeEntry() async throws {
+    let fixture = RouterFixture()
+    let response = try await AnchorMCPToolRouter(actions: fixture.actions).call(
+        .init(
+            name: "context.get_knowledge",
+            arguments: [
+                "knowledge_entry_id": .string(fixture.knowledgeEntry.id.rawValue)
+            ]))
+    let fields = try #require(response.structuredContent?.objectValue)
+    #expect(
+        Set(fields.keys) == [
+            "knowledge_entry_id", "kind", "summary", "origin", "created_at", "source",
+            "source_content_hash", "supporting_message_ids",
+        ])
+    #expect(fields["knowledge_entry_id"] == .string(fixture.knowledgeEntry.id.rawValue))
+    #expect(fields["kind"] == .string("decision"))
+    #expect(fields["summary"] == .string(fixture.knowledgeEntry.summaryText))
+    #expect(fields["origin"] == .string("marked"))
+    #expect(fields["created_at"] == .string(fixture.knowledgeEntry.createdAt.ISO8601Format()))
+    #expect(fields["source"]?.objectValue?["kind"] == .string("session"))
+    #expect(fields["source"]?.objectValue?["session_id"] == .string(fixture.session.id.rawValue))
+    #expect(
+        fields["source_content_hash"] == .string(fixture.knowledgeEntry.sourceContentHash.rawValue))
+    #expect(
+        fields["supporting_message_ids"]
+            == .array(
+                fixture.knowledgeEntry.supportingMessageIDs.map { .string($0.rawValue) }))
+    #expect(
+        response.content == [
+            .text(text: "Knowledge entry available.", annotations: nil, _meta: nil)
+        ])
+    #expect(!String(describing: response.content).contains("fixture-secret"))
+    #expect(!String(describing: response.content).contains("second"))
+}

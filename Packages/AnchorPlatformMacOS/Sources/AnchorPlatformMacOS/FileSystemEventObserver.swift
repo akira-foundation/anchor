@@ -19,6 +19,7 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
     private var continuation: AsyncStream<CheckpointedWorkspaceChange>.Continuation?
     private var pendingPaths: Set<String> = []
     private var pendingCheckpoint: UInt64?
+    private var pendingBatchLastReceivedAt: ContinuousClock.Instant?
     private var flushTask: Task<Void, Never>?
     private var startupReconciliationTask: Task<Void, Never>?
     private var startupReconciliationPending = false
@@ -127,6 +128,7 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
         continuation = nil
         pendingPaths.removeAll()
         pendingCheckpoint = nil
+        pendingBatchLastReceivedAt = nil
         workspaceURL = nil
     }
 
@@ -155,8 +157,12 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
         if !requiresReconciliation, !watched.isEmpty,
             let checkpoint = pathIndices.map({ batch.eventIDs[$0] }).max()
         {
+            let receivedAt = ContinuousClock.now
+            deliverPendingBatchIfSilenceWindowElapsed(at: receivedAt)
+            guard self.observationID == observationID else { return }
             pendingPaths.formUnion(watched)
             pendingCheckpoint = max(pendingCheckpoint ?? checkpoint, checkpoint)
+            pendingBatchLastReceivedAt = receivedAt
             scheduleFlush()
         }
 
@@ -227,6 +233,15 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
         flushTask = nil
         pendingPaths.removeAll()
         pendingCheckpoint = nil
+        pendingBatchLastReceivedAt = nil
+    }
+
+    private func deliverPendingBatchIfSilenceWindowElapsed(
+        at receivedAt: ContinuousClock.Instant
+    ) {
+        guard let pendingBatchLastReceivedAt else { return }
+        guard pendingBatchLastReceivedAt.duration(to: receivedAt) >= silenceWindow else { return }
+        flush()
     }
 
     private func scheduleFlush() {
@@ -253,5 +268,6 @@ public actor FileSystemEventObserver: WorkspaceChangeObserving {
         )
         pendingPaths.removeAll()
         self.pendingCheckpoint = nil
+        pendingBatchLastReceivedAt = nil
     }
 }

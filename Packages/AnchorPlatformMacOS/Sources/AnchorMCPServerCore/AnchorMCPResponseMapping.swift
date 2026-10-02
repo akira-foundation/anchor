@@ -98,6 +98,7 @@ extension AnchorMCPToolRouter {
     func knowledgeEntryFields(_ entry: ProjectResumeKnowledgeEntry) -> Value {
         var fields: [String: Value] = [
             "knowledge_entry_id": .string(entry.id.rawValue),
+            "kind": .string(entry.kind.rawValue),
             "summary": .string(entry.summary),
             "origin": .string(entry.origin.rawValue),
             "created_at": timestampValue(entry.createdAt),
@@ -107,6 +108,20 @@ extension AnchorMCPToolRouter {
             fields["summary_is_truncated"] = .bool(true)
         }
         return .object(fields)
+    }
+
+    func completeKnowledgeEntryFields(_ entry: KnowledgeEntry) -> Value {
+        .object([
+            "knowledge_entry_id": .string(entry.id.rawValue),
+            "kind": .string(entry.kind.rawValue),
+            "summary": .string(entry.summaryText),
+            "origin": .string(entry.origin.rawValue),
+            "created_at": timestampValue(entry.createdAt),
+            "source": knowledgeSourceFields(entry.source),
+            "source_content_hash": .string(entry.sourceContentHash.rawValue),
+            "supporting_message_ids": .array(
+                entry.supportingMessageIDs.map { .string($0.rawValue) }),
+        ])
     }
 
     func knowledgeSourceFields(_ source: KnowledgeEntrySource) -> Value {

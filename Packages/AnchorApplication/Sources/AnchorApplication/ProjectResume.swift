@@ -23,7 +23,7 @@ public struct ProjectResumeLimits: Sendable, Hashable {
     }
 }
 
-public struct ProjectResumeKnowledgeEntry: Sendable, Hashable {
+public struct KnowledgeContextSummary: Sendable, Hashable {
     public let id: KnowledgeEntryID
     public let kind: KnowledgeEntryKind
     public let summary: String
@@ -64,6 +64,8 @@ public struct ProjectResumeKnowledgeEntry: Sendable, Hashable {
         return (prefix + marker, true)
     }
 }
+
+public typealias ProjectResumeKnowledgeEntry = KnowledgeContextSummary
 
 public struct ProjectResume: Sendable, Hashable {
     public let project: ProjectContext

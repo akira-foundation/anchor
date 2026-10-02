@@ -7,7 +7,7 @@ import Foundation
 
 actor PersistentContextReaders: ProjectContextReading, ArtifactContextReading,
     SessionContextReading, ProjectContextSearching, ProjectConversationReading,
-    ProjectResumeReading
+    ProjectResumeReading, KnowledgeContextReading
 {
     private let databaseURL: URL
     private let status: ContextReadModelStatusStore
@@ -130,6 +130,27 @@ actor PersistentContextReaders: ProjectContextReading, ArtifactContextReading,
         try await read { _, sessions, _, _ in
             try await sessions.loadConversationEntries(
                 inSession: sessionID, forProject: projectID, page: page, binding: binding)
+        }
+    }
+
+    func listCurrentKnowledge(
+        forProject projectID: ProjectID, kind: KnowledgeEntryKind?,
+        origin: KnowledgeEntryOrigin?, page: ContextPageRequest,
+        binding: ContextCursorBinding
+    ) async throws -> ContextPage<KnowledgeEntry> {
+        try await read { _, _, knowledge, _ in
+            try await knowledge.listCurrentKnowledge(
+                forProject: projectID, kind: kind, origin: origin,
+                page: page, binding: binding)
+        }
+    }
+
+    func loadCurrentKnowledge(
+        withIdentifier knowledgeEntryID: KnowledgeEntryID, forProject projectID: ProjectID
+    ) async throws -> KnowledgeEntry? {
+        try await read { _, _, knowledge, _ in
+            try await knowledge.loadCurrentKnowledge(
+                withIdentifier: knowledgeEntryID, forProject: projectID)
         }
     }
 

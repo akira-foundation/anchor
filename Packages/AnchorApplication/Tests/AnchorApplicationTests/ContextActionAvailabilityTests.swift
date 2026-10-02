@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Query generation boundaries")
 struct ContextActionAvailabilityTests {
-    @Test("every query action refuses a generation change", arguments: 0..<8)
+    @Test("every query action refuses a generation change", arguments: 0..<10)
     func everyActionRequiresOneGeneration(operation: Int) async throws {
         let fixture = try ContextQueryFixture()
         let availability = ChangingContextAvailability()
@@ -50,11 +50,21 @@ struct ContextActionAvailabilityTests {
                     workspace: fixture, sessions: fixture, availability: availability
                 )
                 .perform(ReadProjectSessionRequest(sessionID: fixture.session.id))
-            default:
+            case 7:
                 _ = try await ReadSessionMessagesAction(
                     workspace: fixture, entries: fixture, availability: availability
                 )
                 .perform(try #require(ReadSessionMessagesRequest(sessionID: fixture.session.id)))
+            case 8:
+                _ = try await ListProjectKnowledgeAction(
+                    workspace: fixture, knowledge: fixture, availability: availability
+                )
+                .perform(try #require(ListProjectKnowledgeRequest()))
+            default:
+                _ = try await ReadProjectKnowledgeAction(
+                    workspace: fixture, knowledge: fixture, availability: availability
+                )
+                .perform(ReadProjectKnowledgeRequest(knowledgeEntryID: fixture.knowledgeEntry.id))
             }
         }
     }

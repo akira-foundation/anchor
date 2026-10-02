@@ -210,6 +210,51 @@ struct ObservationStartupTests {
         #expect(await iterator.next() == nil)
     }
 
+    @Test("an incomplete expired batch cannot contaminate a later observation")
+    func incompleteExpiredBatchDoesNotSurviveRestart() async throws {
+        let workspace = try WorkspaceFixture.make(["graphify-out/unreadable.json": "secret"])
+        let unreadablePath = workspace.appending(path: "graphify-out/unreadable.json").path
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: unreadablePath)
+            try? FileManager.default.removeItem(at: workspace)
+        }
+        let observer = FileSystemEventObserver(silenceWindow: .zero)
+        let firstChanges = try await startObservation(
+            using: observer, at: workspace,
+            receiving: NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/first.json").path],
+                flags: [0], eventIDs: [101]),
+            beforeSecondBatch: {
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0], ofItemAtPath: unreadablePath)
+            },
+            receiving: NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/stale.json").path],
+                flags: [0], eventIDs: [202]))
+
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: unreadablePath)
+        let secondChanges = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.appending(path: "graphify-out/fresh.json").path],
+                flags: [0], eventIDs: [303]))
+        await observer.receiveEvents(
+            NativeFileSystemEventBatch(
+                paths: [workspace.path], flags: [UInt32(kFSEventStreamEventFlagHistoryDone)],
+                eventIDs: [304]))
+        await observer.stopObserving()
+
+        var firstIterator = firstChanges.makeAsyncIterator()
+        #expect(await firstIterator.next() == nil)
+        var secondIterator = secondChanges.makeAsyncIterator()
+        let announcement = await secondIterator.next()
+        #expect(announcement?.change.changedPaths == ["graphify-out/fresh.json"])
+        #expect(announcement?.checkpoint == 303)
+        #expect(await secondIterator.next() == nil)
+    }
+
     @Test("a loss batch preserves watched paths from the same native callback")
     func lossBatchPreservesNativePaths() async throws {
         let workspace = try WorkspaceFixture.make([:])

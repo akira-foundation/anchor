@@ -94,7 +94,7 @@ struct FoundationAgentCommandRunner: AgentCommandRunning {
         let cancellation = AgentCommandCancellation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
+                Thread.detachNewThread {
                     do {
                         let output = try captureOutput(
                             from: process,

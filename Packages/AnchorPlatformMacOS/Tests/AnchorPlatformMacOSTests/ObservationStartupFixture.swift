@@ -43,3 +43,16 @@ func startObservation(
     observer.receiveEvents(batch)
     return changes
 }
+
+func startObservation(
+    using observer: isolated FileSystemEventObserver, at workspaceURL: URL,
+    receiving firstBatch: NativeFileSystemEventBatch,
+    beforeSecondBatch: @Sendable () throws -> Void,
+    receiving secondBatch: NativeFileSystemEventBatch
+) throws -> AsyncStream<CheckpointedWorkspaceChange> {
+    let changes = try observer.startCheckpointedWorkspaceObservation(at: workspaceURL)
+    observer.receiveEvents(firstBatch)
+    try beforeSecondBatch()
+    observer.receiveEvents(secondBatch)
+    return changes
+}

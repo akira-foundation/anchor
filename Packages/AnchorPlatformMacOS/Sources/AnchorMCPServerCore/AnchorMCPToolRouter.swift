@@ -3,33 +3,6 @@ import AnchorDomain
 import Foundation
 import MCP
 
-public struct ContextQueryActions: Sendable {
-    public let currentProject: ResolveCurrentProjectAction
-    public let resume: BuildProjectResumeAction
-    public let search: SearchProjectContextAction
-    public let listArtifacts: ListProjectArtifactsAction
-    public let readArtifact: ReadProjectArtifactAction
-    public let listSessions: ListProjectSessionsAction
-    public let readSession: ReadProjectSessionAction
-    public let readMessages: ReadSessionMessagesAction
-
-    public init(
-        currentProject: ResolveCurrentProjectAction, resume: BuildProjectResumeAction,
-        search: SearchProjectContextAction, listArtifacts: ListProjectArtifactsAction,
-        readArtifact: ReadProjectArtifactAction, listSessions: ListProjectSessionsAction,
-        readSession: ReadProjectSessionAction, readMessages: ReadSessionMessagesAction
-    ) {
-        self.currentProject = currentProject
-        self.resume = resume
-        self.search = search
-        self.listArtifacts = listArtifacts
-        self.readArtifact = readArtifact
-        self.listSessions = listSessions
-        self.readSession = readSession
-        self.readMessages = readMessages
-    }
-}
-
 public struct AnchorMCPToolRouter: Sendable {
     private let actions: ContextQueryActions
     private let catalog = AnchorMCPToolCatalog()
@@ -123,6 +96,30 @@ public struct AnchorMCPToolRouter: Sendable {
                         page.records.map(entryFields), cursor: page.nextCursor,
                         key: "entries"),
                     summary: "Listed \(page.records.count) conversation entries.")
+            case "context.list_knowledge":
+                guard
+                    let request = ListProjectKnowledgeRequest(
+                        kind: try optionalKnowledgeKind(arguments),
+                        origin: try optionalKnowledgeOrigin(arguments),
+                        limit: try optionalInt("limit", arguments),
+                        cursor: try optionalCursor("cursor", arguments))
+                else { throw invalidParameters() }
+                let page = try await actions.listKnowledge.perform(request)
+                return response(
+                    pageFields(
+                        page.records.map(knowledgeEntryFields), cursor: page.nextCursor,
+                        key: "entries"),
+                    summary: "Knowledge entries available.")
+            case "context.get_knowledge":
+                guard
+                    let knowledgeEntryID = KnowledgeEntryID(
+                        rawValue: try requiredString("knowledge_entry_id", arguments))
+                else { throw invalidParameters() }
+                let entry = try await actions.readKnowledge.perform(
+                    .init(knowledgeEntryID: knowledgeEntryID))
+                return response(
+                    completeKnowledgeEntryFields(entry),
+                    summary: "Knowledge entry available.")
             default:
                 throw invalidParameters()
             }
@@ -198,6 +195,22 @@ public struct AnchorMCPToolRouter: Sendable {
         guard let string = argument.stringValue, let provider = AgentProvider(rawValue: string)
         else { throw invalidParameters() }
         return provider
+    }
+
+    private func optionalKnowledgeKind(_ arguments: [String: Value]) throws -> KnowledgeEntryKind? {
+        guard let argument = arguments["kind"] else { return nil }
+        guard let kind = argument.stringValue.flatMap(KnowledgeEntryKind.init(rawValue:))
+        else { throw invalidParameters() }
+        return kind
+    }
+
+    private func optionalKnowledgeOrigin(
+        _ arguments: [String: Value]
+    ) throws -> KnowledgeEntryOrigin? {
+        guard let argument = arguments["origin"] else { return nil }
+        guard let origin = argument.stringValue.flatMap(KnowledgeEntryOrigin.init(rawValue:))
+        else { throw invalidParameters() }
+        return origin
     }
 
     private func invalidParameters() -> MCPError {

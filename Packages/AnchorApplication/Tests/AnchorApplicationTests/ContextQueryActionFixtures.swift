@@ -4,7 +4,7 @@ import Foundation
 @testable import AnchorApplication
 
 struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextReading,
-    SessionContextReading,
+    SessionContextReading, KnowledgeContextReading,
     ArtifactRevisionContentReading, ProjectConversationReading, ContextAvailabilityReading
 {
     let generation = ContextReadGeneration(identifier: UUID())
@@ -13,6 +13,7 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
     let revision: ArtifactRevision
     let unrelatedRevision: ArtifactRevision
     let session: AgentSession
+    let knowledgeEntry: KnowledgeEntry
     let hasSession: Bool
 
     init(hasSession: Bool = true) throws {
@@ -32,6 +33,11 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
         session = AgentSession(
             id: SessionID(), projectID: projectID, provider: .codex,
             startedAt: Date(timeIntervalSince1970: 10), updatedAt: Date(timeIntervalSince1970: 20))
+        knowledgeEntry = KnowledgeEntry(
+            id: KnowledgeEntryID(), projectID: projectID, kind: .decision,
+            summaryText: "Use the current plan", source: .session(session.id),
+            sourceContentHash: ContentHash.digest(of: Data("Use the current plan".utf8)),
+            createdAt: Date(timeIntervalSince1970: 20))
         self.hasSession = hasSession
     }
 
@@ -105,6 +111,19 @@ struct ContextQueryFixture: AuthorizedProjectContextReading, ArtifactContextRead
                 )
             }, nextCursor: nil)
     }
+
+    func listCurrentKnowledge(
+        forProject projectID: ProjectID, kind: KnowledgeEntryKind?, origin: KnowledgeEntryOrigin?,
+        page: ContextPageRequest, binding: ContextCursorBinding
+    ) async throws -> ContextPage<KnowledgeEntry> {
+        ContextPage(records: [knowledgeEntry], nextCursor: nil)
+    }
+    func loadCurrentKnowledge(
+        withIdentifier knowledgeEntryID: KnowledgeEntryID, forProject projectID: ProjectID
+    ) async throws -> KnowledgeEntry? {
+        knowledgeEntryID == knowledgeEntry.id && projectID == knowledgeEntry.projectID
+            ? knowledgeEntry : nil
+    }
 }
 
 actor QuerySearchSpy: ProjectContextSearching {
@@ -169,5 +188,65 @@ actor ProjectResumeReaderSpy: ProjectResumeReading {
         requestedLimits.append(limits)
         if let failure { throw failure }
         return resume
+    }
+}
+
+actor KnowledgeContextReaderSpy: KnowledgeContextReading {
+    enum Failure: Error { case cursor, storage, unavailable }
+
+    struct ListCall: Sendable {
+        let projectID: ProjectID
+        let kind: KnowledgeEntryKind?
+        let origin: KnowledgeEntryOrigin?
+        let page: ContextPageRequest
+        let binding: ContextCursorBinding
+    }
+
+    let entry: KnowledgeEntry
+    let nextCursor: ContextPageCursor?
+    let hasEntry: Bool
+    let failure: Failure?
+    private(set) var listCalls: [ListCall] = []
+    private(set) var detailIdentifiers: [KnowledgeEntryID] = []
+    private(set) var detailProjects: [ProjectID] = []
+
+    init(
+        entry: KnowledgeEntry, nextCursor: ContextPageCursor? = nil,
+        hasEntry: Bool = true, failure: Failure? = nil
+    ) {
+        self.entry = entry
+        self.nextCursor = nextCursor
+        self.hasEntry = hasEntry
+        self.failure = failure
+    }
+
+    func listCurrentKnowledge(
+        forProject projectID: ProjectID, kind: KnowledgeEntryKind?, origin: KnowledgeEntryOrigin?,
+        page: ContextPageRequest, binding: ContextCursorBinding
+    ) async throws -> ContextPage<KnowledgeEntry> {
+        listCalls.append(
+            ListCall(
+                projectID: projectID, kind: kind, origin: origin, page: page, binding: binding))
+        try throwConfiguredFailure()
+        return ContextPage(records: [entry], nextCursor: nextCursor)
+    }
+
+    func loadCurrentKnowledge(
+        withIdentifier knowledgeEntryID: KnowledgeEntryID, forProject projectID: ProjectID
+    ) async throws -> KnowledgeEntry? {
+        detailIdentifiers.append(knowledgeEntryID)
+        detailProjects.append(projectID)
+        try throwConfiguredFailure()
+        return hasEntry && knowledgeEntryID == entry.id && projectID == entry.projectID
+            ? entry : nil
+    }
+
+    private func throwConfiguredFailure() throws {
+        switch failure {
+        case .cursor: throw ContextCursorFailure.invalid
+        case .storage: throw Failure.storage
+        case .unavailable: throw ContextQueryFailure.contextUnavailable
+        case nil: break
+        }
     }
 }

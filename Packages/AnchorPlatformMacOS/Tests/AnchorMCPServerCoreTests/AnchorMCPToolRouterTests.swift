@@ -7,7 +7,7 @@ import Testing
 @testable import AnchorMCPServerCore
 
 @Test("each tool dispatches to its matching context query")
-func routerDispatchesEightQueries() async throws {
+func routerDispatchesTenQueries() async throws {
     let fixture = RouterFixture()
     let router = AnchorMCPToolRouter(actions: fixture.actions)
     let calls: [(String, [String: Value], String, String)] = [
@@ -27,6 +27,12 @@ func routerDispatchesEightQueries() async throws {
         (
             "context.get_messages", ["session_id": .string(fixture.session.id.rawValue)], "entries",
             "messages"
+        ),
+        ("context.list_knowledge", [:], "entries", "knowledge-list"),
+        (
+            "context.get_knowledge",
+            ["knowledge_entry_id": .string(fixture.knowledgeEntry.id.rawValue)],
+            "summary", "knowledge-detail"
         ),
     ]
     for (name, arguments, expectedKey, expectedOperation) in calls {
@@ -52,6 +58,23 @@ func routerRejectsMalformedCalls() async throws {
         CallTool.Parameters(name: "context.search", arguments: ["text": .string(" ")]),
         CallTool.Parameters(
             name: "context.search", arguments: ["text": .string("x"), "limit": .int(101)]),
+        CallTool.Parameters(name: "context.list_knowledge", arguments: ["kind": .string("other")]),
+        CallTool.Parameters(
+            name: "context.list_knowledge", arguments: ["origin": .string("other")]),
+        CallTool.Parameters(name: "context.list_knowledge", arguments: ["limit": .bool(true)]),
+        CallTool.Parameters(name: "context.list_knowledge", arguments: ["limit": .int(101)]),
+        CallTool.Parameters(name: "context.list_knowledge", arguments: ["extra": .int(1)]),
+        CallTool.Parameters(name: "context.get_knowledge", arguments: [:]),
+        CallTool.Parameters(
+            name: "context.get_knowledge", arguments: ["knowledge_entry_id": .string(" ")]),
+        CallTool.Parameters(
+            name: "context.get_knowledge", arguments: ["knowledge_entry_id": .string("")]),
+        CallTool.Parameters(
+            name: "context.get_knowledge",
+            arguments: ["knowledge_entry_id": .string("not-an-identifier")]),
+        CallTool.Parameters(
+            name: "context.get_knowledge",
+            arguments: ["knowledge_entry_id": .string(UUID().uuidString), "extra": .bool(true)]),
     ] {
         do {
             _ = try await router.call(parameters)
@@ -60,6 +83,82 @@ func routerRejectsMalformedCalls() async throws {
         } catch {
             Issue.record("Expected invalidParams for \(parameters.name), received \(error)")
         }
+    }
+}
+
+@Test("knowledge filters are forwarded as typed values and cursors map to typed failures")
+func routerForwardsKnowledgeFiltersAndMapsCursorFailure() async throws {
+    let fixture = RouterFixture()
+    let router = AnchorMCPToolRouter(actions: fixture.actions)
+    let response = try await router.call(
+        .init(
+            name: "context.list_knowledge",
+            arguments: [
+                "kind": .string("decision"), "origin": .string("marked"), "limit": .int(1),
+            ]))
+    #expect(response.isError == false)
+    #expect(await fixture.requestedKnowledgeKind == .decision)
+    #expect(await fixture.requestedKnowledgeOrigin == .marked)
+    #expect(await fixture.requestedKnowledgeLimit == 1)
+    let cursorFailure = try await router.call(
+        .init(
+            name: "context.list_knowledge", arguments: ["cursor": .string("search-cursor")]))
+    #expect(cursorFailure.isError == true)
+    #expect(cursorFailure.structuredContent?.objectValue?["code"] == .string("invalid_cursor"))
+    let missing = try await router.call(
+        .init(
+            name: "context.get_knowledge",
+            arguments: ["knowledge_entry_id": .string(KnowledgeEntryID().rawValue)]))
+    #expect(missing.structuredContent?.objectValue?["code"] == .string("entity_not_found"))
+}
+
+@Test("knowledge tools preserve typed failure codes")
+func routerMapsKnowledgeFailures() async throws {
+    for (failure, code) in [
+        (ContextQueryFailure.workspaceNotAuthorized, "workspace_not_authorized"),
+        (.contextUnavailable, "context_unavailable"),
+        (.readFailed, "read_failed"),
+    ] {
+        let fixture = RouterFixture(failure: failure)
+        for (name, arguments) in [
+            ("context.list_knowledge", [String: Value]()),
+            (
+                "context.get_knowledge",
+                ["knowledge_entry_id": .string(fixture.knowledgeEntry.id.rawValue)]
+            ),
+        ] {
+            let response = try await AnchorMCPToolRouter(actions: fixture.actions).call(
+                .init(name: name, arguments: arguments))
+            #expect(response.isError == true)
+            #expect(response.structuredContent?.objectValue?["code"] == .string(code))
+        }
+    }
+}
+
+@Test("legacy eight-action composition reports unavailable knowledge")
+func legacyActionBundleMapsKnowledgeUnavailable() async throws {
+    let fixture = RouterFixture()
+    let suppliedActions = fixture.actions
+    let legacyActions = ContextQueryActions(
+        currentProject: suppliedActions.currentProject,
+        resume: suppliedActions.resume,
+        search: suppliedActions.search,
+        listArtifacts: suppliedActions.listArtifacts,
+        readArtifact: suppliedActions.readArtifact,
+        listSessions: suppliedActions.listSessions,
+        readSession: suppliedActions.readSession,
+        readMessages: suppliedActions.readMessages)
+    let router = AnchorMCPToolRouter(actions: legacyActions)
+    for (name, arguments) in [
+        ("context.list_knowledge", [String: Value]()),
+        (
+            "context.get_knowledge",
+            ["knowledge_entry_id": .string(fixture.knowledgeEntry.id.rawValue)]
+        ),
+    ] {
+        let response = try await router.call(.init(name: name, arguments: arguments))
+        #expect(response.isError == true)
+        #expect(response.structuredContent?.objectValue?["code"] == .string("context_unavailable"))
     }
 }
 
@@ -95,198 +194,10 @@ func serverServesToolsOverInMemoryTransport() async throws {
     let initialization = try await client.connect(transport: transports.client)
     #expect(initialization.serverInfo.name == "anchor")
     let listed = try await client.listTools()
-    #expect(listed.tools.count == 8)
+    #expect(listed.tools.count == 10)
     let call = try await client.callTool(name: "context.current_project")
     #expect(call.isError == false)
     #expect(!call.content.isEmpty)
     await client.disconnect()
     await server.waitUntilCompleted()
-}
-
-actor RouterFixture: AuthorizedProjectContextReading, ContextAvailabilityReading,
-    ProjectContextSearching, ArtifactContextReading, ArtifactRevisionContentReading,
-    SessionContextReading, ProjectConversationReading, ProjectResumeReading
-{
-    nonisolated let project: ProjectContext
-    nonisolated let artifact: Artifact
-    nonisolated let revision: ArtifactRevision
-    nonisolated let session: AgentSession
-    nonisolated let populatedResume: ProjectResume
-    private let failure: ContextQueryFailure?
-    private let includesSession: Bool
-    private let messageContent: String
-    private let toolName: String
-    private let invocation: String
-    private let outcome: String?
-    private let searchExcerpt: String?
-    private(set) var operations: [String] = []
-
-    init(
-        failure: ContextQueryFailure? = nil, includesSession: Bool = true,
-        messageContent: String = "fixture-secret long message",
-        toolName: String = "read", invocation: String = "fixture-secret invocation",
-        outcome: String? = nil, projectName: String = "Example",
-        workspacePath: String = "/example", canonicalRemote: String? = nil,
-        artifactName: String = "notes.md", searchExcerpt: String? = nil
-    ) {
-        let projectID = ProjectID()
-        project = ProjectContext(
-            projectID: projectID, displayName: projectName,
-            canonicalRepositoryRemote: canonicalRemote.flatMap(
-                CanonicalRepositoryRemote.init(rawValue:)),
-            workspaceURL: URL(filePath: workspacePath))
-        artifact = Artifact(
-            id: ArtifactID(), projectID: projectID, provider: .codex, name: artifactName)!
-        revision = ArtifactRevision(
-            id: RevisionID(), artifactID: artifact.id, parentRevisionID: nil,
-            contentHash: ContentHash.digest(of: Data("fixture-secret".utf8)), deviceID: DeviceID(),
-            createdAt: Date(timeIntervalSince1970: 10))!
-        session = AgentSession(
-            id: SessionID(), projectID: projectID, provider: .codex,
-            startedAt: Date(timeIntervalSince1970: 10), updatedAt: Date(timeIntervalSince1970: 20))
-        let plan = Self.resumeArtifact(
-            seed: "router-plan", projectID: projectID, provider: .superpowers,
-            name: "docs/superpowers/plans/current.md", revisedAt: 31)
-        let brainstorm = Self.resumeArtifact(
-            seed: "router-brainstorm", projectID: projectID, provider: .superpowers,
-            name: ".superpowers/brainstorm/current.md", revisedAt: 32)
-        let graph = Self.resumeArtifact(
-            seed: "router-graph", projectID: projectID, provider: .graphify,
-            name: "graphs/current.json", revisedAt: 33)
-        let decision = Self.resumeKnowledge(
-            seed: "router-decision", projectID: projectID, kind: .decision,
-            summary: String(repeating: "é", count: 300), source: .artifact(plan.artifact.id),
-            createdAt: 34)
-        let todo = Self.resumeKnowledge(
-            seed: "router-todo", projectID: projectID, kind: .todo,
-            summary: "Ship the compact resume", source: .session(session.id), createdAt: 35)
-        let question = Self.resumeKnowledge(
-            seed: "router-question", projectID: projectID, kind: .question,
-            summary: "What comes next?", source: .artifact(graph.artifact.id), createdAt: 36)
-        populatedResume = ProjectResume(
-            project: project,
-            recentSession: SessionContextRecord(
-                session: session, messageCount: 7, toolActivityCount: 3),
-            lastPresence: DevicePresence(
-                projectID: projectID, deviceID: DeviceID.derived(fromSeed: "router-device"),
-                lastSeenAt: Date(timeIntervalSince1970: 30)),
-            latestArtifactRevisionAt: Date(timeIntervalSince1970: 40),
-            latestKnowledgeEntryAt: Date(timeIntervalSince1970: 36),
-            currentPlan: plan, latestBrainstorm: brainstorm, relevantGraphs: [graph],
-            recentDecisions: [decision], openTodos: [todo], openQuestions: [question],
-            hasMoreDecisions: true, hasMoreTodos: false, hasMoreQuestions: true)
-        self.failure = failure
-        self.includesSession = includesSession
-        self.messageContent = messageContent
-        self.toolName = toolName
-        self.invocation = invocation
-        self.outcome = outcome
-        self.searchExcerpt = searchExcerpt
-    }
-
-    nonisolated var actions: ContextQueryActions {
-        ContextQueryActions(
-            currentProject: ResolveCurrentProjectAction(workspace: self, availability: self),
-            resume: BuildProjectResumeAction(
-                workspace: self, resumes: self, availability: self),
-            search: SearchProjectContextAction(workspace: self, search: self, availability: self),
-            listArtifacts: ListProjectArtifactsAction(
-                workspace: self, artifacts: self, availability: self),
-            readArtifact: ReadProjectArtifactAction(
-                workspace: self, artifacts: self, content: self, availability: self),
-            listSessions: ListProjectSessionsAction(
-                workspace: self, sessions: self, availability: self),
-            readSession: ReadProjectSessionAction(
-                workspace: self, sessions: self, availability: self),
-            readMessages: ReadSessionMessagesAction(
-                workspace: self, entries: self, availability: self))
-    }
-
-    func loadAvailableGeneration() async throws -> ContextReadGeneration {
-        if let failure { throw failure }
-        return ContextReadGeneration(
-            identifier: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
-    }
-    func loadAuthorizedProjectContext() async throws -> ProjectContext {
-        operations.append("project")
-        return project
-    }
-    func loadProjectResume(
-        for project: ProjectContext, limits: ProjectResumeLimits
-    ) async throws -> ProjectResume {
-        operations.append("resume")
-        return includesSession ? populatedResume : ProjectResume(project: project)
-    }
-    func searchContext(
-        forProject projectID: ProjectID, matching text: String, page: ContextPageRequest,
-        binding: ContextCursorBinding
-    )
-        async throws -> ContextPage<ProjectContextSearchHit>
-    {
-        operations.append("search")
-        guard let searchExcerpt else { return ContextPage(records: [], nextCursor: nil) }
-        return ContextPage(
-            records: [
-                ProjectContextSearchHit(
-                    sessionID: session.id, provider: .codex, kind: .message(.user),
-                    excerpt: searchExcerpt, timestamp: Date(timeIntervalSince1970: 12))
-            ], nextCursor: nil)
-    }
-    func listArtifacts(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
-        binding: ContextCursorBinding
-    )
-        async throws -> ContextPage<ArtifactContextRecord>
-    {
-        operations.append("artifacts")
-        return ContextPage(
-            records: [ArtifactContextRecord(artifact: artifact, latestRevision: revision)!],
-            nextCursor: nil)
-    }
-    func loadArtifact(withIdentifier artifactID: ArtifactID) async throws -> ArtifactContextRecord?
-    {
-        operations.append("artifact")
-        return ArtifactContextRecord(artifact: artifact, latestRevision: revision)
-    }
-    func loadRevision(withIdentifier revisionID: RevisionID) async throws -> ArtifactRevision? {
-        revision
-    }
-    func readContent(forRevision revisionID: RevisionID) async throws -> Data? {
-        Data("fixture-secret".utf8)
-    }
-    func listSessions(
-        forProject projectID: ProjectID, provider: AgentProvider?, page: ContextPageRequest,
-        binding: ContextCursorBinding
-    )
-        async throws -> ContextPage<SessionContextRecord>
-    {
-        operations.append("sessions")
-        return ContextPage(
-            records: includesSession ? [SessionContextRecord(session: session)] : [],
-            nextCursor: nil)
-    }
-    func loadSession(withIdentifier sessionID: SessionID) async throws -> SessionContextRecord? {
-        operations.append("session")
-        return SessionContextRecord(session: session, messageCount: 1, toolActivityCount: 1)
-    }
-    func loadConversationEntries(
-        inSession sessionID: SessionID, forProject projectID: ProjectID,
-        page: ContextPageRequest, binding: ContextCursorBinding
-    ) async throws -> ContextPage<ConversationEntry> {
-        operations.append("messages")
-        return ContextPage(
-            records: [
-                .message(
-                    ConversationMessage(
-                        id: MessageID(), sessionID: session.id, role: .user,
-                        content: messageContent,
-                        timestamp: Date(timeIntervalSince1970: 12))),
-                .toolActivity(
-                    ToolActivity(
-                        id: ToolActivityID(), sessionID: session.id, toolName: toolName,
-                        invocation: invocation, outcome: outcome, failed: false,
-                        timestamp: Date(timeIntervalSince1970: 13))),
-            ], nextCursor: nil)
-    }
-
 }

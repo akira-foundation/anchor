@@ -1,13 +1,10 @@
 import AnchorApplication
 import AnchorPlatformMacOS
-import Foundation
 import SwiftUI
 
 struct AgentIntegrationStatusView: View {
     let report: AgentClientBootstrapReport?
     let isRunning: Bool
-    let helperExecutableURL: URL
-    let workspaceURL: URL?
     let retry: () -> Void
 
     var body: some View {
@@ -31,12 +28,8 @@ struct AgentIntegrationStatusView: View {
                         }
                     }
                 }
-                Text("MCP server: \(helperExecutableURL.path)")
-                if let workspaceURL {
-                    Text("Authorized workspace: \(workspaceURL.path)")
-                }
                 if presentation.canRetry {
-                    Button("Retry", action: retry).disabled(isRunning)
+                    Button("Retry integrations", action: retry).disabled(isRunning)
                 }
             }
             .font(.caption)

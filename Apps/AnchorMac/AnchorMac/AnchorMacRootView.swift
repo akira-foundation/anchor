@@ -1,4 +1,3 @@
-import AnchorPlatformMacOS
 import AnchorSharedUI
 import SwiftUI
 
@@ -8,67 +7,61 @@ struct AnchorMacRootView: View {
     let contextEngine: AnchorMacContextEngine
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AnchorShellHeader(
-                titleText: applicationDisplayName,
-                subtitleText: applicationPurposeDescription
-            )
+        let presentation = AnchorMacStatusPresentation(state: contextEngine.state)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                AnchorShellHeader(
+                    titleText: applicationDisplayName,
+                    subtitleText: applicationPurposeDescription)
 
-            Text(engineStatusText)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let projectName = presentation.projectName {
+                        Text(projectName).font(.headline)
+                    }
+                    Text(presentation.statusText).foregroundStyle(.secondary)
+                }
 
-            AgentIntegrationStatusView(
-                report: contextEngine.agentBootstrapReport,
-                isRunning: contextEngine.isAgentBootstrapRunning,
-                helperExecutableURL: contextEngine.helperExecutableURL,
-                workspaceURL: contextEngine.agentBootstrapWorkspaceURL,
-                retry: contextEngine.retryAgentBootstrap)
+                ForEach(presentation.rows, id: \.title) { row in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(row.title)
+                        Spacer()
+                        Text(row.statusText)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .font(.callout)
+                }
+
+                if let guidanceText = presentation.guidanceText {
+                    Text(guidanceText).font(.caption).foregroundStyle(.secondary)
+                }
+
+                AgentIntegrationStatusView(
+                    report: contextEngine.agentBootstrapReport,
+                    isRunning: contextEngine.isAgentBootstrapRunning,
+                    retry: contextEngine.retryAgentBootstrap)
+
+                Divider()
+                DisclosureGroup("Details") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let workspaceURL = contextEngine.agentBootstrapWorkspaceURL {
+                            Text("Authorized workspace: \(workspaceURL.path)")
+                        }
+                        Text("MCP server: \(contextEngine.helperExecutableURL.path)")
+                        if let diagnosticText = presentation.diagnosticText {
+                            Text(diagnosticText)
+                        }
+                    }
+                    .font(.caption)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
+                }
+                .font(.caption)
+            }
+            .padding(16)
         }
-        .frame(width: 320, alignment: .topLeading)
-        .padding(16)
+        .frame(width: 360, height: 440)
         .task { await contextEngine.refreshRefusals() }
-    }
-
-    private func indexSuffix(_ indexedSessions: Int?) -> String {
-        guard let indexedSessions else { return "\nSearch is off: the index could not be built" }
-
-        return "\n\(indexedSessions) sessions searchable"
-    }
-
-    private func inferenceSuffix(_ status: KnowledgeInferenceStatus) -> String {
-        switch status {
-        case .disabled:
-            return "\nKnowledge inference is off"
-        case .ready:
-            return "\nInferring knowledge from sessions"
-        case .unavailable(let description):
-            return "\nKnowledge inference unavailable: \(description)"
-        }
-    }
-
-    private func refusalSuffix(_ refusals: [String]) -> String {
-        guard let latest = refusals.last else { return "" }
-
-        return "\nlatest refusal: \(latest)"
-    }
-
-    private var engineStatusText: String {
-        switch contextEngine.state {
-        case .idle:
-            return "Not watching yet"
-        case .watching(let projectName, .synchronized, let indexed, let inference, let refusals):
-            return "Watching \(projectName), synchronized with iCloud"
-                + indexSuffix(indexed) + inferenceSuffix(inference) + refusalSuffix(refusals)
-        case .watching(
-            let projectName, .localOnlyUntilAccountReturns, let indexed, let inference,
-            let refusals):
-            return "Watching \(projectName), on this Mac only. iCloud was unreachable at launch"
-                + indexSuffix(indexed) + inferenceSuffix(inference) + refusalSuffix(refusals)
-        case .noWorkspaceConfigured:
-            return "No workspace configured"
-        case .failed(let description):
-            return "Stopped: \(description)"
-        }
     }
 }

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A29000000000000000000003 = {isa = PBXBuildFile; fileRef = A29000000000000000000004; };
+		A29000000000000000000005 = {isa = PBXBuildFile; fileRef = A29000000000000000000006; };
+		A29000000000000000000007 = {isa = PBXBuildFile; productRef = F6D14A4AC4380AC9C222DC1F; };
+		A29000000000000000000001 /* AnchorMacStatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29000000000000000000002 /* AnchorMacStatusPresentation.swift */; };
 		A2B000000000000000000001 /* AnchorApplication in Frameworks */ = {isa = PBXBuildFile; productRef = A28000000000000000000002 /* AnchorApplication */; };
 		A2B000000000000000000002 /* AnchorPlatformMacOS in Frameworks */ = {isa = PBXBuildFile; productRef = A1D0000000000000000000A1 /* AnchorPlatformMacOS */; };
 		A2B00000000000000000000F /* AnchorMacContextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B00000000000000000000E /* AnchorMacContextEngine.swift */; };
@@ -51,6 +55,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A29000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorMac/AnchorMacRootView.swift; sourceTree = SOURCE_ROOT; };
+		A29000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorMac/AgentIntegrationStatusView.swift; sourceTree = SOURCE_ROOT; };
+		A29000000000000000000002 /* AnchorMacStatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorMac/AnchorMacStatusPresentation.swift; sourceTree = SOURCE_ROOT; };
 		A2B000000000000000000003 /* AnchorMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnchorMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2B00000000000000000000E /* AnchorMacContextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorMac/AnchorMacContextEngine.swift; sourceTree = SOURCE_ROOT; };
 		A9C000000000000000000004 /* AnchorMCPServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AnchorMCPServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -81,6 +88,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A2B000000000000000000001 /* AnchorApplication in Frameworks */,
+				A29000000000000000000007 /* AnchorSharedUI in Frameworks */,
 				A2B000000000000000000002 /* AnchorPlatformMacOS in Frameworks */,
 				A2B000000000000000000010 /* AnchorPersistence in Frameworks */,
 				A2B000000000000000000011 /* AnchorPlatformAppleCloud in Frameworks */,
@@ -321,6 +329,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A2B00000000000000000000F /* AnchorMacContextEngine.swift in Sources */,
+				A29000000000000000000001 /* AnchorMacStatusPresentation.swift in Sources */,
+				A29000000000000000000003 /* AnchorMacRootView.swift in Sources */,
+				A29000000000000000000005 /* AgentIntegrationStatusView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

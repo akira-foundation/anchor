@@ -76,7 +76,7 @@ if name == 'xcrun':
         sys.stdout.write('{"devices":{}}')
         sys.exit(0)
     sys.stdout.write('{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-5":['
-                     '{"name":"iPhone 17 Pro","udid":"IPHONE-AVAILABLE","isAvailable":true},'
+                     '{"name":"iPhone 18 Pro","udid":"IPHONE-AVAILABLE","isAvailable":true},'
                      '{"name":"iPad Pro 13-inch (M5)","udid":"IPAD-AVAILABLE","isAvailable":true}'
                      ']}}')
 '''

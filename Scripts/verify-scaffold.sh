@@ -108,7 +108,7 @@ sys.exit(f"No available simulator named {device_name}")
 PY
 }
 
-IPHONE_SIMULATOR_ID="$(resolve_simulator_identifier 'iPhone 17 Pro')"
+IPHONE_SIMULATOR_ID="$(resolve_simulator_identifier 'iPhone 18 Pro')"
 xcodebuild build -workspace Anchor.xcworkspace -scheme AnchorMobile \
     -destination "platform=iOS Simulator,id=${IPHONE_SIMULATOR_ID}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" -quiet

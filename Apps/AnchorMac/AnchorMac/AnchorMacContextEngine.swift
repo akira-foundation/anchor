@@ -3,6 +3,7 @@ import AnchorPersistence
 import AnchorPlatformAppleCloud
 import AnchorPlatformMacOS
 import AnchorStorage
+import AnchorStoredContext
 import CloudKit
 import Foundation
 import Observation

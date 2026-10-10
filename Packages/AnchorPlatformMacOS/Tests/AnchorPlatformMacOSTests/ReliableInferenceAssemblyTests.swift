@@ -5,6 +5,7 @@ import AnchorKnowledge
 import AnchorPersistence
 import AnchorSearch
 import AnchorStorage
+import AnchorStoredContext
 import CryptoKit
 import Foundation
 import Testing

@@ -1,5 +1,6 @@
 import AnchorMCPServerCore
 import AnchorPlatformMacOS
+import AnchorStoredContext
 import Darwin
 import Foundation
 

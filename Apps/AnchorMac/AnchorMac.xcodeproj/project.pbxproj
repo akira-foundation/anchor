@@ -16,12 +16,14 @@
 		A2B00000000000000000000F /* AnchorMacContextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B00000000000000000000E /* AnchorMacContextEngine.swift */; };
 		A2B000000000000000000010 /* AnchorPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A7D0000000000000000000A7 /* AnchorPersistence */; };
 		A2B000000000000000000011 /* AnchorPlatformAppleCloud in Frameworks */ = {isa = PBXBuildFile; productRef = A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */; };
+		C4A1000000000000000000F1 /* AnchorStoredContext in Frameworks */ = {isa = PBXBuildFile; productRef = C4A1000000000000000000F3 /* AnchorStoredContext */; };
 		A2B000000000000000000012 /* AnchorStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A3D0000000000000000000A3 /* AnchorStorage */; };
 		A28000000000000000000001 /* AnchorApplication in Frameworks */ = {isa = PBXBuildFile; productRef = A28000000000000000000002 /* AnchorApplication */; };
 		A9C000000000000000000001 /* AnchorMCPServerCore in Frameworks */ = {isa = PBXBuildFile; productRef = A9C000000000000000000002 /* AnchorMCPServerCore */; };
 		A9C000000000000000000003 /* AnchorMCPServer.app in Embed Helpers */ = {isa = PBXBuildFile; fileRef = A9C000000000000000000004 /* AnchorMCPServer.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		074F800F3045954F00FF709E /* AnchorPlatformMacOS in Frameworks */ = {isa = PBXBuildFile; productRef = A1D0000000000000000000A1 /* AnchorPlatformMacOS */; };
 		074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */ = {isa = PBXBuildFile; productRef = A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */; };
+		C4A1000000000000000000F2 /* AnchorStoredContext in Frameworks */ = {isa = PBXBuildFile; productRef = C4A1000000000000000000F3 /* AnchorStoredContext */; };
 		074F80113045954F00FF709E /* AnchorStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A3D0000000000000000000A3 /* AnchorStorage */; };
 		65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */; };
 		075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A5D0000000000000000000A5 /* AnchorSearch */; };
@@ -92,6 +94,7 @@
 				A2B000000000000000000002 /* AnchorPlatformMacOS in Frameworks */,
 				A2B000000000000000000010 /* AnchorPersistence in Frameworks */,
 				A2B000000000000000000011 /* AnchorPlatformAppleCloud in Frameworks */,
+				C4A1000000000000000000F1 /* AnchorStoredContext in Frameworks */,
 				A2B000000000000000000012 /* AnchorStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -111,6 +114,7 @@
 				A28000000000000000000001 /* AnchorApplication in Frameworks */,
 				074F80113045954F00FF709E /* AnchorStorage in Frameworks */,
 				074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */,
+				C4A1000000000000000000F2 /* AnchorStoredContext in Frameworks */,
 				074F800F3045954F00FF709E /* AnchorPlatformMacOS in Frameworks */,
 				65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */,
 				075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */,
@@ -168,6 +172,7 @@
 				A1D0000000000000000000A1 /* AnchorPlatformMacOS */,
 				A7D0000000000000000000A7 /* AnchorPersistence */,
 				A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */,
+				C4A1000000000000000000F3 /* AnchorStoredContext */,
 				A3D0000000000000000000A3 /* AnchorStorage */,
 			);
 			productName = AnchorMacTests;
@@ -220,6 +225,7 @@
 				F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */,
 				A1D0000000000000000000A1 /* AnchorPlatformMacOS */,
 				A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */,
+				C4A1000000000000000000F3 /* AnchorStoredContext */,
 				A3D0000000000000000000A3 /* AnchorStorage */,
 				A5D0000000000000000000A5 /* AnchorSearch */,
 				A6D0000000000000000000A6 /* AnchorKnowledge */,
@@ -265,6 +271,7 @@
 				455B8E31530B84BF6C9CB103 /* XCLocalSwiftPackageReference "../../Packages/AnchorSharedUI" */,
 				B1D0000000000000000000B1 /* XCLocalSwiftPackageReference "../../Packages/AnchorPlatformMacOS" */,
 				B2D0000000000000000000B2 /* XCLocalSwiftPackageReference "../../Packages/AnchorPlatformAppleCloud" */,
+				C4A1000000000000000000F4 /* XCLocalSwiftPackageReference "../../Packages/AnchorStoredContext" */,
 				B3D0000000000000000000B3 /* XCLocalSwiftPackageReference "../../Packages/AnchorStorage" */,
 				B5D0000000000000000000B5 /* XCLocalSwiftPackageReference "../../Packages/AnchorSearch" */,
 				B6D0000000000000000000B6 /* XCLocalSwiftPackageReference "../../Packages/AnchorKnowledge" */,
@@ -578,6 +585,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/AnchorPlatformAppleCloud;
 		};
+		C4A1000000000000000000F4 /* XCLocalSwiftPackageReference "../../Packages/AnchorStoredContext" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/AnchorStoredContext;
+		};
 		B3D0000000000000000000B3 /* XCLocalSwiftPackageReference "../../Packages/AnchorStorage" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/AnchorStorage;
@@ -616,6 +627,10 @@
 		A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AnchorPlatformAppleCloud;
+		};
+		C4A1000000000000000000F3 /* AnchorStoredContext */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnchorStoredContext;
 		};
 		A3D0000000000000000000A3 /* AnchorStorage */ = {
 			isa = XCSwiftPackageProductDependency;

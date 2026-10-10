@@ -14,6 +14,7 @@ let package = Package(
         .package(path: "../AnchorApplication"),
         .package(path: "../AnchorProvider"),
         .package(path: "../AnchorStorage"),
+        .package(path: "../AnchorStoredContext"),
         .package(path: "../AnchorSync"),
         .package(path: "../AnchorPersistence"),
         .package(path: "../AnchorSearch"),
@@ -29,6 +30,7 @@ let package = Package(
                 .product(name: "AnchorApplication", package: "AnchorApplication"),
                 .product(name: "AnchorProvider", package: "AnchorProvider"),
                 .product(name: "AnchorStorage", package: "AnchorStorage"),
+                .product(name: "AnchorStoredContext", package: "AnchorStoredContext"),
                 .product(name: "AnchorPersistence", package: "AnchorPersistence"),
                 .product(name: "AnchorSync", package: "AnchorSync"),
                 .product(name: "AnchorSearch", package: "AnchorSearch"),
@@ -42,6 +44,7 @@ let package = Package(
                 "AnchorPlatformMacOS",
                 .product(name: "AnchorApplicationTestSupport", package: "AnchorApplication"),
                 .product(name: "AnchorSync", package: "AnchorSync"),
+                .product(name: "AnchorStoredContext", package: "AnchorStoredContext"),
             ]
         ),
         .target(

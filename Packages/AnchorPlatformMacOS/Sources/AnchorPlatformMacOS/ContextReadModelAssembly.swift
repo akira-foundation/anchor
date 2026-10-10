@@ -1,6 +1,7 @@
 import AnchorApplication
 import AnchorDomain
 import AnchorPersistence
+import AnchorStoredContext
 import CryptoKit
 import Foundation
 

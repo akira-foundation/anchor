@@ -2,6 +2,7 @@ import AnchorApplication
 import AnchorDomain
 import AnchorProvider
 import AnchorStorage
+import AnchorStoredContext
 import Foundation
 import Testing
 

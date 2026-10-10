@@ -16,6 +16,7 @@ public actor WorkspaceObservationCoordinator {
     private let sessionContext: SessionContextRecording?
     private let artifactIndex: (any ArtifactContextIndexing)?
     private let contextStatus: ContextReadModelStatusStore?
+    private let contextPublication: PublishProjectContextAction?
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var activeObservationID: UUID?
@@ -36,6 +37,7 @@ public actor WorkspaceObservationCoordinator {
         sessionContext: SessionContextRecording? = nil,
         artifactIndex: (any ArtifactContextIndexing)? = nil,
         contextStatus: ContextReadModelStatusStore? = nil,
+        contextPublication: PublishProjectContextAction? = nil,
         initialRefusals: [String] = [],
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -49,6 +51,7 @@ public actor WorkspaceObservationCoordinator {
         self.sessionContext = sessionContext
         self.artifactIndex = artifactIndex
         self.contextStatus = contextStatus
+        self.contextPublication = contextPublication
         refusals = Array(initialRefusals.suffix(Self.rememberedRefusalCount))
         refusalCount = initialRefusals.count
         self.now = now
@@ -110,6 +113,7 @@ public actor WorkspaceObservationCoordinator {
         await recording("synchronizing revisions") {
             try await synchronizer.synchronizePendingArtifactRevisions()
         }
+        await publishContext(forWorkspaceAt: workspaceURL)
     }
 
     public func stopObserving() async {
@@ -143,6 +147,17 @@ public actor WorkspaceObservationCoordinator {
         try await presences.announcePresence(
             DevicePresence(projectID: projectID, deviceID: device.id, lastSeenAt: now())
         )
+    }
+
+    private func publishContext(forWorkspaceAt workspaceURL: URL) async {
+        guard let contextPublication else { return }
+        do {
+            let report = try await contextPublication.perform(
+                PublishProjectContextRequest(workspaceURL: workspaceURL))
+            recordRefusals(report.refusals)
+        } catch {
+            remember("publishing context", "\(error)")
+        }
     }
 
     private func recordObservedChange(
@@ -196,6 +211,7 @@ public actor WorkspaceObservationCoordinator {
         await recording("synchronizing revisions") {
             try await synchronizer.synchronizePendingArtifactRevisions()
         }
+        await publishContext(forWorkspaceAt: change.workspaceURL)
         return activeObservationID == observationID && !Task.isCancelled
     }
 

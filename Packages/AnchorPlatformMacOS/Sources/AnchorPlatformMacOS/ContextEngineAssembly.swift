@@ -20,6 +20,7 @@ public enum ContextEngineAssembly {
         artifactIndex: (any ArtifactContextIndexing)? = nil,
         contextStatus: ContextReadModelStatusStore? = nil,
         presenceSnapshot: (any DevicePresenceSnapshotStore)? = nil,
+        contextPublication: PublishProjectContextAction? = nil,
         initialRefusals: [String] = []
     ) -> WorkspaceObservationCoordinator {
         let workspaceURL = observedWorkspace.workspaceURL
@@ -48,6 +49,7 @@ public enum ContextEngineAssembly {
             sessionContext: sessionContext,
             artifactIndex: artifactIndex,
             contextStatus: contextStatus,
+            contextPublication: contextPublication,
             initialRefusals: initialRefusals
         )
     }

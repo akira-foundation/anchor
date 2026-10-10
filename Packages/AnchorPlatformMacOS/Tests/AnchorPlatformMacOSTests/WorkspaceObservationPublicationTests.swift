@@ -35,6 +35,22 @@ struct WorkspaceObservationPublicationTests {
         #expect(refusals.contains { $0.hasPrefix("publishing project Anchor:") })
     }
 
+    @Test("an observed edit publishes the project context again")
+    func observedEditPublishesContextAgain() async throws {
+        let workspace = try WorkspaceFixture.make(["docs/superpowers/plans/00-indice.md": "before"])
+        let publisher = RecordingPublicationTarget()
+        let coordinator = makeCoordinator(workspace: workspace, publisher: publisher)
+
+        try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
+        try Data("after".utf8)
+            .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
+        let publishedCount = await publisher.awaitPublishedProjectCount(
+            reaching: 2, within: .seconds(10))
+        await coordinator.stopObserving()
+
+        #expect(publishedCount == 2)
+    }
+
     private func makeCoordinator(
         workspace: URL, publisher: RecordingPublicationTarget
     ) -> WorkspaceObservationCoordinator {
@@ -83,6 +99,16 @@ private actor RecordingPublicationTarget:
     func publishProjectDescriptor(_ descriptor: PublishedProjectDescriptor) async throws {
         guard !refusingProjects else { throw PublicationRefused() }
         publishedProjectCount += 1
+    }
+
+    func awaitPublishedProjectCount(reaching target: Int, within limit: Duration) async -> Int {
+        let deadline = ContinuousClock.now.advanced(by: limit)
+
+        while publishedProjectCount < target, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        return publishedProjectCount
     }
 
     func publishArtifactDescriptor(_ artifact: Artifact) async throws {}

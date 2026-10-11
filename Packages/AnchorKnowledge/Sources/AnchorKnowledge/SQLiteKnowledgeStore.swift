@@ -65,17 +65,21 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
         forProject projectID: ProjectID, includingSuperseded: Bool
     ) async throws -> [KnowledgeEntry] {
         let rows = try await database.run(
-            """
-            SELECT id, project_id, kind, summary_text, source, source_content_hash,
-                   origin, supporting_message_ids, state, created_at
-            FROM knowledge_entries
-            WHERE project_id = ? AND state \(Self.stateFilter(includingSuperseded))
-            ORDER BY created_at, id;
-            """,
+            Self.entriesStatement(includingSuperseded: includingSuperseded),
             [.text(projectID.rawValue)]
         )
 
         return try rows.map(Self.entry)
+    }
+
+    static func entriesStatement(includingSuperseded: Bool) -> String {
+        """
+        SELECT id, project_id, kind, summary_text, source, source_content_hash,
+               origin, supporting_message_ids, state, created_at
+        FROM knowledge_entries
+        WHERE project_id = ? AND state \(Self.stateFilter(includingSuperseded))
+        ORDER BY created_at, id;
+        """
     }
 
     public func loadCurrentEntries(
@@ -117,25 +121,6 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
         guard let createdAt = row["created_at"]?.integer
         else { throw SQLiteKnowledgeStoreFailure.malformedEntryRecord }
         return Date(timeIntervalSince1970: TimeInterval(createdAt))
-    }
-
-    public func loadKnowledgeSources(
-        forProject projectID: ProjectID
-    ) async throws -> [KnowledgeEntrySource] {
-        let rows = try await database.run(
-            """
-            SELECT source, MIN(created_at) AS first_created_at FROM knowledge_entries
-            WHERE project_id = ?
-            GROUP BY source
-            ORDER BY first_created_at, source;
-            """,
-            [.text(projectID.rawValue)])
-
-        return try rows.map { row in
-            guard let source = row["source"]?.text.flatMap(Self.decodedSource(from:))
-            else { throw SQLiteKnowledgeStoreFailure.malformedEntryRecord }
-            return source
-        }
     }
 
     private static func stateFilter(_ includingSuperseded: Bool) -> String {
@@ -225,7 +210,7 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
         )
     }
 
-    private static func decodedSource(from text: String) -> KnowledgeEntrySource? {
+    static func decodedSource(from text: String) -> KnowledgeEntrySource? {
         try? JSONDecoder().decode(KnowledgeEntrySource.self, from: Data(text.utf8))
     }
 

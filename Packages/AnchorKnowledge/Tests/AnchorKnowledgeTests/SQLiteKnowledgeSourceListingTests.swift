@@ -20,12 +20,13 @@ struct SQLiteKnowledgeSourceListingTests {
             [entry("first", active, 20), entry("second", active, 30)],
             supersedingEntriesFrom: active)
 
-        let sources = try await store.loadKnowledgeSources(forProject: projectID)
+        let listing = try await store.loadPublishableKnowledge(forProject: projectID)
 
-        #expect(sources == [retired, active])
+        #expect(listing.sources == [retired, active])
+        #expect(listing.currentEntries.map(\.summaryText) == ["first", "second"])
     }
 
-    @Test("sources of another project are not listed")
+    @Test("sources and entries of another project are not listed")
     func sourcesOfAnotherProjectAreNotListed() async throws {
         let store = try await SQLiteKnowledgeStore(database: try SQLiteDatabase(fileURL: nil))
         let foreignSource = KnowledgeEntrySource.session(SessionID())
@@ -33,7 +34,10 @@ struct SQLiteKnowledgeSourceListingTests {
             [entry("foreign", foreignSource, 10, projectID: ProjectID())],
             supersedingEntriesFrom: foreignSource)
 
-        #expect(try await store.loadKnowledgeSources(forProject: projectID).isEmpty)
+        let listing = try await store.loadPublishableKnowledge(forProject: projectID)
+
+        #expect(listing.sources.isEmpty)
+        #expect(listing.currentEntries.isEmpty)
     }
 
     private func entry(

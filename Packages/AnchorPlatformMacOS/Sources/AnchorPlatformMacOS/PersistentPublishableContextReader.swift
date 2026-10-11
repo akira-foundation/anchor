@@ -18,6 +18,8 @@ public struct PersistentPublishableContextReader: PublishableProjectContextReadi
     ) async throws -> PublishableProjectContext? {
         guard let project = try await artifacts.loadProjectContext(forWorkspaceAt: workspaceURL)
         else { return nil }
+        let knowledgeListing = try await knowledge.loadPublishableKnowledge(
+            forProject: project.projectID)
 
         return PublishableProjectContext(
             project: PublishedProjectDescriptor(
@@ -25,9 +27,7 @@ public struct PersistentPublishableContextReader: PublishableProjectContextReadi
                 displayName: project.displayName,
                 canonicalRepositoryRemote: project.canonicalRepositoryRemote),
             artifacts: try await artifacts.loadArtifacts(forProject: project.projectID),
-            knowledgeEntries: try await knowledge.entries(
-                forProject: project.projectID, includingSuperseded: false),
-            knowledgeSources: try await knowledge.loadKnowledgeSources(
-                forProject: project.projectID))
+            knowledgeEntries: knowledgeListing.currentEntries,
+            knowledgeSources: knowledgeListing.sources)
     }
 }

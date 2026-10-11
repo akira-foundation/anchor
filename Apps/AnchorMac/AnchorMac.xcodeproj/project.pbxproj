@@ -24,6 +24,7 @@
 		074F800F3045954F00FF709E /* AnchorPlatformMacOS in Frameworks */ = {isa = PBXBuildFile; productRef = A1D0000000000000000000A1 /* AnchorPlatformMacOS */; };
 		074F80103045954F00FF709E /* AnchorPlatformAppleCloud in Frameworks */ = {isa = PBXBuildFile; productRef = A2D0000000000000000000A2 /* AnchorPlatformAppleCloud */; };
 		C4A1000000000000000000F2 /* AnchorStoredContext in Frameworks */ = {isa = PBXBuildFile; productRef = C4A1000000000000000000F3 /* AnchorStoredContext */; };
+		C4A1000000000000000000F5 /* AnchorStoredContext in Frameworks */ = {isa = PBXBuildFile; productRef = C4A1000000000000000000F3 /* AnchorStoredContext */; };
 		074F80113045954F00FF709E /* AnchorStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A3D0000000000000000000A3 /* AnchorStorage */; };
 		65FCCC274994BE493B062D05 /* AnchorSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = F6D14A4AC4380AC9C222DC1F /* AnchorSharedUI */; };
 		075F800F3045954F00FF7000 /* AnchorSearch in Frameworks */ = {isa = PBXBuildFile; productRef = A5D0000000000000000000A5 /* AnchorSearch */; };
@@ -104,6 +105,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A9C000000000000000000001 /* AnchorMCPServerCore in Frameworks */,
+				C4A1000000000000000000F5 /* AnchorStoredContext in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +198,7 @@
 			name = AnchorMCPServer;
 			packageProductDependencies = (
 				A9C000000000000000000002 /* AnchorMCPServerCore */,
+				C4A1000000000000000000F3 /* AnchorStoredContext */,
 			);
 			productName = AnchorMCPServer;
 			productReference = A9C000000000000000000004 /* AnchorMCPServer.app */;

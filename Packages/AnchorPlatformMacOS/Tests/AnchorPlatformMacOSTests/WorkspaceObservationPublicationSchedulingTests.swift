@@ -51,12 +51,15 @@ struct WorkspaceObservationPublicationSchedulingTests {
         let startup = Task {
             try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
         }
-        _ = await publisher.awaitStartedProjectCount(reaching: 1, within: .seconds(10))
+        let startedCount = await publisher.awaitStartedProjectCount(
+            reaching: 1, within: .seconds(10))
+        #expect(startedCount == 1)
         await coordinator.stopObserving()
         await gate.open()
         try await startup.value
-        try await Task.sleep(for: .milliseconds(300))
+        await coordinator.awaitPublicationSettled()
 
+        #expect(await publisher.publishedProjectCount == 1)
         #expect(await publisher.publishedArtifactCount == 0)
         #expect(await coordinator.recordedRefusals.allSatisfy { !$0.contains("publishing") })
     }
@@ -75,10 +78,12 @@ struct WorkspaceObservationPublicationSchedulingTests {
             await coordinator.requestContextPublication(forWorkspaceAt: workspace)
         }
         await gate.open()
-        _ = await publisher.awaitPublishedProjectCount(reaching: 2, within: .seconds(10))
-        try await Task.sleep(for: .milliseconds(300))
+        await coordinator.awaitPublicationSettled()
+        let startedCount = await publisher.startedProjectCount
+        let publishedCount = await publisher.publishedProjectCount
         await coordinator.stopObserving()
 
-        #expect(await publisher.startedProjectCount == 2)
+        #expect(startedCount == 2)
+        #expect(publishedCount == 2)
     }
 }

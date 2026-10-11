@@ -20,6 +20,7 @@ public actor WorkspaceObservationCoordinator {
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
     private var publicationTask: Task<Void, Never>?
+    private var latestPublicationTask: Task<Void, Never>?
     private var isPublicationRequestedAgain = false
     private var activeObservationID: UUID?
     private var isStartingObservation = false
@@ -164,6 +165,14 @@ public actor WorkspaceObservationCoordinator {
         publicationTask = Task { [weak self] in
             await self?.publishContextUntilSettled(
                 contextPublication, forWorkspaceAt: workspaceURL, observationID: observationID)
+        }
+        latestPublicationTask = publicationTask
+    }
+
+    func awaitPublicationSettled() async {
+        while let awaitedPublication = latestPublicationTask {
+            await awaitedPublication.value
+            guard latestPublicationTask != awaitedPublication else { return }
         }
     }
 

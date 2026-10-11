@@ -17,8 +17,8 @@ struct WorkspaceObservationPublicationTests {
             projectID: projectID, workspace: workspace, publisher: publisher)
 
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
-        let publishedCount = await publisher.awaitPublishedProjectCount(
-            reaching: 1, within: .seconds(10))
+        await coordinator.awaitPublicationSettled()
+        let publishedCount = await publisher.publishedProjectCount
         await coordinator.stopObserving()
 
         #expect(publishedCount == 1)
@@ -47,13 +47,16 @@ struct WorkspaceObservationPublicationTests {
             projectID: projectID, workspace: workspace, publisher: publisher)
 
         try await coordinator.startObserving(workspaceAt: workspace, forProject: projectID)
-        _ = await publisher.awaitPublishedProjectCount(reaching: 1, within: .seconds(10))
+        await coordinator.awaitPublicationSettled()
+        let publishedAtStartup = await publisher.publishedProjectCount
         try Data("after".utf8)
             .write(to: workspace.appending(path: "docs/superpowers/plans/00-indice.md"))
-        let publishedCount = await publisher.awaitPublishedProjectCount(
-            reaching: 2, within: .seconds(10))
+        _ = await publisher.awaitPublishedProjectCount(reaching: 2, within: .seconds(10))
+        await coordinator.awaitPublicationSettled()
+        let publishedAfterEdit = await publisher.publishedProjectCount
         await coordinator.stopObserving()
 
-        #expect(publishedCount == 2)
+        #expect(publishedAtStartup == 1)
+        #expect(publishedAfterEdit == 2)
     }
 }

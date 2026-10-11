@@ -3,7 +3,7 @@ import Foundation
 import Security
 import Testing
 
-@testable import AnchorPlatformMacOS
+@testable import AnchorStoredContext
 
 private let liveKeychainIsAllowed =
     ProcessInfo.processInfo.environment["ANCHOR_KEYCHAIN_TESTS"]

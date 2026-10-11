@@ -3,6 +3,7 @@ import AnchorPersistence
 import AnchorPlatformAppleCloud
 import AnchorPlatformMacOS
 import AnchorStorage
+import AnchorStoredContext
 import CloudKit
 import Foundation
 import Observation
@@ -196,6 +197,8 @@ final class AnchorMacContextEngine {
             artifactIndex: sessionContext.artifactIndex,
             contextStatus: readModel.status,
             presenceSnapshot: readModel.presences,
+            contextPublication: ContextPublicationAssembly.makePublication(
+                database: readModel.database, storage: storage),
             initialRefusals: initialRefusals
         )
 

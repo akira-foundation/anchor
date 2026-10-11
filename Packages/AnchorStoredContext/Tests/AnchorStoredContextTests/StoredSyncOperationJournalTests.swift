@@ -4,7 +4,7 @@ import AnchorStorage
 import Foundation
 import Testing
 
-@testable import AnchorPlatformMacOS
+@testable import AnchorStoredContext
 
 @Suite("Stored sync operation journal")
 struct StoredSyncOperationJournalTests {

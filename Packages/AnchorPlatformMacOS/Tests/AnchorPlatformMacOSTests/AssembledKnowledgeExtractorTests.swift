@@ -2,6 +2,7 @@ import AnchorDomain
 import AnchorIntelligence
 import AnchorPersistence
 import AnchorStorage
+import AnchorStoredContext
 import CryptoKit
 import Foundation
 import Testing

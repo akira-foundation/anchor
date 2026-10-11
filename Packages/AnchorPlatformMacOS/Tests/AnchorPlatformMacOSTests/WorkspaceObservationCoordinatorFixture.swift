@@ -2,6 +2,7 @@ import AnchorApplication
 import AnchorDomain
 import AnchorProvider
 import AnchorStorage
+import AnchorStoredContext
 import AnchorSync
 import Foundation
 import Testing
@@ -20,7 +21,8 @@ extension WorkspaceObservationCoordinatorTests {
         discoverer: (any ArtifactDiscovering)? = nil,
         artifactIndex: (any ArtifactContextIndexing)? = nil,
         contextStatus: ContextReadModelStatusStore? = nil,
-        sessionContext: (any SessionContextRecording)? = nil
+        sessionContext: (any SessionContextRecording)? = nil,
+        contextPublication: PublishProjectContextAction? = nil
     ) -> (WorkspaceObservationCoordinator, StoredSyncOperationJournal) {
         let operationJournal = StoredSyncOperationJournal(storage: storage)
         let coordinator = WorkspaceObservationCoordinator(
@@ -56,6 +58,7 @@ extension WorkspaceObservationCoordinatorTests {
             sessionContext: sessionContext,
             artifactIndex: artifactIndex,
             contextStatus: contextStatus,
+            contextPublication: contextPublication,
             now: { Date(timeIntervalSince1970: 1_000) }
         )
 

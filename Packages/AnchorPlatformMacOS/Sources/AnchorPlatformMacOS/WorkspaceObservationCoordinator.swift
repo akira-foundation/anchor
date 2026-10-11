@@ -16,8 +16,12 @@ public actor WorkspaceObservationCoordinator {
     private let sessionContext: SessionContextRecording?
     private let artifactIndex: (any ArtifactContextIndexing)?
     private let contextStatus: ContextReadModelStatusStore?
+    private let contextPublication: PublishProjectContextAction?
     private let now: @Sendable () -> Date
     private var observationTask: Task<Void, Never>?
+    private var publicationTask: Task<Void, Never>?
+    private var latestPublicationTask: Task<Void, Never>?
+    private var isPublicationRequestedAgain = false
     private var activeObservationID: UUID?
     private var isStartingObservation = false
     private var startupWasCancelled = false
@@ -36,6 +40,7 @@ public actor WorkspaceObservationCoordinator {
         sessionContext: SessionContextRecording? = nil,
         artifactIndex: (any ArtifactContextIndexing)? = nil,
         contextStatus: ContextReadModelStatusStore? = nil,
+        contextPublication: PublishProjectContextAction? = nil,
         initialRefusals: [String] = [],
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -49,6 +54,7 @@ public actor WorkspaceObservationCoordinator {
         self.sessionContext = sessionContext
         self.artifactIndex = artifactIndex
         self.contextStatus = contextStatus
+        self.contextPublication = contextPublication
         refusals = Array(initialRefusals.suffix(Self.rememberedRefusalCount))
         refusalCount = initialRefusals.count
         self.now = now
@@ -110,6 +116,7 @@ public actor WorkspaceObservationCoordinator {
         await recording("synchronizing revisions") {
             try await synchronizer.synchronizePendingArtifactRevisions()
         }
+        requestContextPublication(forWorkspaceAt: workspaceURL)
     }
 
     public func stopObserving() async {
@@ -117,6 +124,9 @@ public actor WorkspaceObservationCoordinator {
         startupWasCancelled = true
         observationTask?.cancel()
         observationTask = nil
+        publicationTask?.cancel()
+        publicationTask = nil
+        isPublicationRequestedAgain = false
         activeObservationID = nil
         if let observationID { await observer.stopObserving(forObservation: observationID) }
         if isStartingObservation {
@@ -143,6 +153,49 @@ public actor WorkspaceObservationCoordinator {
         try await presences.announcePresence(
             DevicePresence(projectID: projectID, deviceID: device.id, lastSeenAt: now())
         )
+    }
+
+    func requestContextPublication(forWorkspaceAt workspaceURL: URL) {
+        guard let contextPublication, let observationID = activeObservationID else { return }
+        guard publicationTask == nil else {
+            isPublicationRequestedAgain = true
+            return
+        }
+
+        publicationTask = Task { [weak self] in
+            await self?.publishContextUntilSettled(
+                contextPublication, forWorkspaceAt: workspaceURL, observationID: observationID)
+        }
+        latestPublicationTask = publicationTask
+    }
+
+    func awaitPublicationSettled() async {
+        while let awaitedPublication = latestPublicationTask {
+            await awaitedPublication.value
+            guard latestPublicationTask != awaitedPublication else { return }
+        }
+    }
+
+    private func publishContextUntilSettled(
+        _ contextPublication: PublishProjectContextAction,
+        forWorkspaceAt workspaceURL: URL, observationID: UUID
+    ) async {
+        repeat {
+            isPublicationRequestedAgain = false
+            do {
+                let report = try await contextPublication.perform(
+                    PublishProjectContextRequest(workspaceURL: workspaceURL))
+                recordRefusals(report.refusals)
+            } catch is CancellationError {
+                return
+            } catch {
+                remember("publishing context", "\(error)")
+            }
+        } while isPublicationRequestedAgain && activeObservationID == observationID
+            && !Task.isCancelled
+
+        guard activeObservationID == observationID else { return }
+        publicationTask = nil
     }
 
     private func recordObservedChange(
@@ -196,6 +249,7 @@ public actor WorkspaceObservationCoordinator {
         await recording("synchronizing revisions") {
             try await synchronizer.synchronizePendingArtifactRevisions()
         }
+        requestContextPublication(forWorkspaceAt: change.workspaceURL)
         return activeObservationID == observationID && !Task.isCancelled
     }
 

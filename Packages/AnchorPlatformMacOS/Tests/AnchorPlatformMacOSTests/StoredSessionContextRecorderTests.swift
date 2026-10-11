@@ -4,6 +4,7 @@ import AnchorKnowledge
 import AnchorPersistence
 import AnchorSearch
 import AnchorStorage
+import AnchorStoredContext
 import Foundation
 import Testing
 

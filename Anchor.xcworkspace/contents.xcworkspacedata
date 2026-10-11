@@ -30,6 +30,9 @@
          location = "group:AnchorStorage">
       </FileRef>
       <FileRef
+         location = "group:AnchorStoredContext">
+      </FileRef>
+      <FileRef
          location = "group:AnchorSync">
       </FileRef>
       <FileRef

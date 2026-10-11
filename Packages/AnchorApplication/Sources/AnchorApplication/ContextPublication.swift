@@ -17,6 +17,27 @@ public struct PublishedProjectDescriptor: Sendable, Hashable, Codable {
     }
 }
 
+public struct PublishedArtifactDescriptor: Sendable, Hashable, Codable {
+    public let artifactID: ArtifactID
+    public let projectID: ProjectID
+    public let provider: AgentProvider
+    public let name: String
+
+    public init(artifactID: ArtifactID, projectID: ProjectID, provider: AgentProvider, name: String)
+    {
+        self.artifactID = artifactID
+        self.projectID = projectID
+        self.provider = provider
+        self.name = name
+    }
+
+    public init(artifact: Artifact) {
+        self.init(
+            artifactID: artifact.id, projectID: artifact.projectID, provider: artifact.provider,
+            name: artifact.name)
+    }
+}
+
 public struct KnowledgeSourceSnapshot: Sendable, Hashable, Codable {
     public let projectID: ProjectID
     public let source: KnowledgeEntrySource

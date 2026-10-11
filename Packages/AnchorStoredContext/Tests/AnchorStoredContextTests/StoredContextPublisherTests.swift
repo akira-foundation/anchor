@@ -50,6 +50,27 @@ struct StoredContextPublisherTests {
         #expect(await remote.putCount == 1)
     }
 
+    @Test("an artifact descriptor body carries only the published fields")
+    func artifactDescriptorBodyCarriesOnlyPublishedFields() async throws {
+        let remote = InMemoryStorageProvider()
+        let publisher = StoredContextPublisher(remote: remote, ledger: InMemoryStorageProvider())
+        let artifact = try #require(
+            Artifact(
+                id: .derived(projectID: projectID, provider: .claude, name: "session.jsonl"),
+                projectID: projectID, provider: .claude, name: "session.jsonl",
+                retention: .latestRevisionOnly))
+
+        try await publisher.publishArtifactDescriptor(artifact)
+
+        let artifactKey = try #require(PublishedContextKeys.artifactKey(for: artifact.id))
+        let stored = try #require(try await remote.object(for: artifactKey))
+        let envelope = try #require(
+            try JSONSerialization.jsonObject(with: stored.object.contents) as? [String: Any])
+        let body = try #require(envelope["body"] as? [String: Any])
+        #expect(Set(body.keys) == ["artifactID", "projectID", "provider", "name"])
+        #expect(body["artifactID"] as? String == artifact.id.rawValue)
+    }
+
     @Test("an artifact descriptor written by another Mac counts as published")
     func existingArtifactDescriptorCountsAsPublished() async throws {
         let sharedRemote = InMemoryStorageProvider()

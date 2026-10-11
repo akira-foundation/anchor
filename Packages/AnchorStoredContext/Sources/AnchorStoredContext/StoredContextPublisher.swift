@@ -35,7 +35,8 @@ public struct StoredContextPublisher:
         }
 
         try await publish(
-            artifact, at: PublishedContextKeys.artifactKey(for: artifact.id),
+            PublishedArtifactDescriptor(artifact: artifact),
+            at: PublishedContextKeys.artifactKey(for: artifact.id),
             precondition: .objectIsAbsent)
     }
 

@@ -20,6 +20,24 @@ struct PublishedContextCodecTests {
         #expect(decoded == descriptor)
     }
 
+    @Test("an artifact descriptor decodes to what was encoded")
+    func artifactDescriptorRoundTrips() throws {
+        let projectID = ProjectID()
+        let artifact = try #require(
+            Artifact(
+                id: .derived(projectID: projectID, provider: .codex, name: "rollout.jsonl"),
+                projectID: projectID, provider: .codex, name: "rollout.jsonl",
+                retention: .latestRevisionOnly))
+        let descriptor = PublishedArtifactDescriptor(artifact: artifact)
+
+        let decoded = try PublishedContextCodec.decode(
+            PublishedArtifactDescriptor.self, from: try PublishedContextCodec.encode(descriptor))
+
+        #expect(decoded == descriptor)
+        #expect(decoded.artifactID == artifact.id)
+        #expect(decoded.name == "rollout.jsonl")
+    }
+
     @Test("a knowledge snapshot decodes to what was encoded")
     func knowledgeSnapshotRoundTrips() throws {
         let projectID = ProjectID()

@@ -19,8 +19,22 @@ struct SQLiteArtifactPublicationTests {
         try await store.indexArtifactRevisions(owned + [foreign])
 
         let listed = try await store.loadArtifacts(forProject: projectID)
-        #expect(Set(listed) == Set(owned.map(\.artifact)))
-        #expect(listed == listed.sorted { $0.id.rawValue < $1.id.rawValue })
+        #expect(listed.map(\.id) == owned.map(\.artifact.id).sorted { $0.rawValue < $1.rawValue })
+        #expect(listed.allSatisfy { $0.projectID == projectID })
+    }
+
+    @Test("an artifact indexed twice is listed once")
+    func artifactIndexedTwiceIsListedOnce() async throws {
+        let projectID = ProjectID()
+        let store = try await SQLiteArtifactContextStore(database: try SQLiteDatabase(fileURL: nil))
+        let firstRevision = try indexedRevision(projectID: projectID, name: "plan.md")
+        let secondRevision = try indexedRevision(projectID: projectID, name: "plan.md")
+
+        try await store.indexArtifactRevisions([firstRevision])
+        try await store.indexArtifactRevisions([secondRevision])
+
+        let listed = try await store.loadArtifacts(forProject: projectID)
+        #expect(listed == [firstRevision.artifact])
     }
 
     private func indexedRevision(

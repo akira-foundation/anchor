@@ -80,6 +80,40 @@ struct PublishProjectContextActionTests {
         #expect(report.refusals.first?.hasPrefix("publishing artifact first.md:") == true)
     }
 
+    @Test("a cancelled publication stops and is not reported as a refusal")
+    func cancelledPublicationStopsWithoutRefusal() async throws {
+        let first = try #require(makeArtifact(name: "first.md"))
+        let second = try #require(makeArtifact(name: "second.md"))
+        let publisher = RecordingContextPublisher(cancellingArtifactName: "first.md")
+        let action = makeAction(
+            context: PublishableProjectContext(
+                project: descriptor, artifacts: [first, second], knowledgeEntries: []),
+            publisher: publisher)
+
+        await #expect(throws: CancellationError.self) {
+            try await action.perform(PublishProjectContextRequest(workspaceURL: workspaceURL))
+        }
+        #expect(await publisher.artifacts.isEmpty)
+    }
+
+    @Test("a cancelled task publishes nothing after the cancellation")
+    func cancelledTaskPublishesNothingFurther() async throws {
+        let artifact = try #require(makeArtifact(name: "first.md"))
+        let publisher = RecordingContextPublisher(cancellingTaskOnProject: true)
+        let action = makeAction(
+            context: PublishableProjectContext(
+                project: descriptor, artifacts: [artifact], knowledgeEntries: []),
+            publisher: publisher)
+
+        let publication = Task {
+            try await action.perform(PublishProjectContextRequest(workspaceURL: workspaceURL))
+        }
+
+        await #expect(throws: CancellationError.self) { try await publication.value }
+        #expect(await publisher.projects == [descriptor])
+        #expect(await publisher.artifacts.isEmpty)
+    }
+
     @Test("an unknown workspace publishes nothing")
     func unknownWorkspacePublishesNothing() async throws {
         let publisher = RecordingContextPublisher()
@@ -149,19 +183,28 @@ private actor RecordingContextPublisher:
     ProjectDescriptorPublishing, ArtifactDescriptorPublishing, KnowledgeSnapshotPublishing
 {
     private let failingArtifactName: String?
+    private let cancellingArtifactName: String?
+    private let cancellingTaskOnProject: Bool
     private(set) var projects: [PublishedProjectDescriptor] = []
     private(set) var artifacts: [Artifact] = []
     private(set) var snapshots: [KnowledgeSourceSnapshot] = []
 
-    init(failingArtifactName: String? = nil) {
+    init(
+        failingArtifactName: String? = nil, cancellingArtifactName: String? = nil,
+        cancellingTaskOnProject: Bool = false
+    ) {
         self.failingArtifactName = failingArtifactName
+        self.cancellingArtifactName = cancellingArtifactName
+        self.cancellingTaskOnProject = cancellingTaskOnProject
     }
 
     func publishProjectDescriptor(_ descriptor: PublishedProjectDescriptor) async throws {
         projects.append(descriptor)
+        if cancellingTaskOnProject { withUnsafeCurrentTask { $0?.cancel() } }
     }
 
     func publishArtifactDescriptor(_ artifact: Artifact) async throws {
+        guard artifact.name != cancellingArtifactName else { throw CancellationError() }
         guard artifact.name != failingArtifactName else { throw PublicationRefused() }
         artifacts.append(artifact)
     }

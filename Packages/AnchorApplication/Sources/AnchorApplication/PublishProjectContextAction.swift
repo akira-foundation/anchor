@@ -40,7 +40,7 @@ public struct PublishProjectContextAction: Action {
         else { return PublishProjectContextReport(refusals: []) }
 
         var refusals: [String] = []
-        if let refusal = await refusal(
+        if let refusal = try await refusal(
             publishing: "project \(context.project.displayName)",
             {
                 try await projects.publishProjectDescriptor(context.project)
@@ -49,7 +49,7 @@ public struct PublishProjectContextAction: Action {
             refusals.append(refusal)
         }
         for artifact in context.artifacts {
-            if let refusal = await refusal(
+            if let refusal = try await refusal(
                 publishing: "artifact \(artifact.name)",
                 {
                     try await artifacts.publishArtifactDescriptor(artifact)
@@ -59,7 +59,7 @@ public struct PublishProjectContextAction: Action {
             }
         }
         for snapshot in Self.knowledgeSnapshots(in: context) {
-            if let refusal = await refusal(
+            if let refusal = try await refusal(
                 publishing: "knowledge \(snapshot.source)",
                 {
                     try await knowledge.publishKnowledgeSnapshot(snapshot)
@@ -74,11 +74,15 @@ public struct PublishProjectContextAction: Action {
 
     private func refusal(
         publishing target: String, _ publication: () async throws -> Void
-    ) async -> String? {
+    ) async throws -> String? {
+        try Task.checkCancellation()
         do {
             try await publication()
             return nil
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            try Task.checkCancellation()
             return "publishing \(target): \(error)"
         }
     }

@@ -38,6 +38,22 @@ struct StoredContextPublisherTests {
         #expect(decoded.displayName == "Anchor Renamed")
     }
 
+    @Test("a failed remote write is retried by the next publication")
+    func failedRemoteWriteIsRetried() async throws {
+        let remote = CountingStorageProvider(
+            wrapping: InMemoryStorageProvider(), failingFirstPuts: 1)
+        let publisher = StoredContextPublisher(remote: remote, ledger: InMemoryStorageProvider())
+
+        await #expect(throws: StorageFailure.transportUnavailable) {
+            try await publisher.publishProjectDescriptor(descriptor(named: "Anchor"))
+        }
+        try await publisher.publishProjectDescriptor(descriptor(named: "Anchor"))
+
+        let projectKey = try #require(PublishedContextKeys.projectKey(for: projectID))
+        #expect(await remote.putCount == 1)
+        #expect(try await remote.object(for: projectKey) != nil)
+    }
+
     @Test("an artifact descriptor is written once")
     func artifactDescriptorIsWrittenOnce() async throws {
         let remote = CountingStorageProvider(wrapping: InMemoryStorageProvider())
@@ -116,7 +132,9 @@ struct StoredContextPublisherTests {
             try #require(
                 KnowledgeSourceSnapshot(projectID: projectID, source: source, entries: [entry])))
 
-        for metadata in try await plain.listObjects(withPrefix: nil) {
+        let publishedObjects = try await plain.listObjects(withPrefix: nil)
+        #expect(!publishedObjects.isEmpty)
+        for metadata in publishedObjects {
             let stored = try #require(try await plain.object(for: metadata.key))
             let text = String(decoding: stored.object.contents, as: UTF8.self)
             #expect(!text.contains("Secret Project"))
@@ -138,16 +156,28 @@ struct StoredContextPublisherTests {
 
 private actor PutCounter {
     private(set) var count = 0
+    private var remainingFailures: Int
+
+    init(failingFirstPuts: Int) {
+        remainingFailures = failingFirstPuts
+    }
 
     func increment() { count += 1 }
+
+    func consumeFailure() -> Bool {
+        guard remainingFailures > 0 else { return false }
+        remainingFailures -= 1
+        return true
+    }
 }
 
 private struct CountingStorageProvider: StorageProvider {
     let wrapped: any StorageProvider
-    let counter = PutCounter()
+    let counter: PutCounter
 
-    init(wrapping wrapped: any StorageProvider) {
+    init(wrapping wrapped: any StorageProvider, failingFirstPuts: Int = 0) {
         self.wrapped = wrapped
+        counter = PutCounter(failingFirstPuts: failingFirstPuts)
     }
 
     var putCount: Int {
@@ -157,6 +187,7 @@ private struct CountingStorageProvider: StorageProvider {
     func putObject(
         _ storageObject: StorageObject, precondition: StorageWritePrecondition
     ) async throws(StorageFailure) -> StorageObjectMetadata {
+        guard await !counter.consumeFailure() else { throw .transportUnavailable }
         let metadata = try await wrapped.putObject(storageObject, precondition: precondition)
         await counter.increment()
         return metadata

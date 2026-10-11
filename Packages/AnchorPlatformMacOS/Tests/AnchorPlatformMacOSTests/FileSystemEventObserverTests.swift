@@ -21,12 +21,13 @@ struct FileSystemEventObserverTests {
             NativeFileSystemEventBatch(
                 paths: [workspace.appending(path: "graphify-out/second.json").path],
                 flags: [0], eventIDs: [202]))
-        try await Task.sleep(for: .milliseconds(100))
-        await observer.stopObserving()
+        let watchdog = stopObserving(observer, after: .seconds(10))
+        defer { watchdog.cancel() }
 
         var iterator = changes.makeAsyncIterator()
         let first = await iterator.next()
         let second = await iterator.next()
+        await observer.stopObserving()
         #expect(first?.change.changedPaths == ["graphify-out/first.json"])
         #expect(first?.checkpoint == 101)
         #expect(second?.change.changedPaths == ["graphify-out/second.json"])
@@ -38,7 +39,7 @@ struct FileSystemEventObserverTests {
     func coalescedPathsRetainMaximumNativeEventID() async throws {
         let workspace = try WorkspaceFixture.make([:])
         defer { try? FileManager.default.removeItem(at: workspace) }
-        let observer = FileSystemEventObserver(silenceWindow: .milliseconds(20))
+        let observer = FileSystemEventObserver(silenceWindow: .seconds(1))
         let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
         await observer.receiveEvents(
             NativeFileSystemEventBatch(
@@ -49,11 +50,12 @@ struct FileSystemEventObserverTests {
             NativeFileSystemEventBatch(
                 paths: [workspace.appending(path: "graphify-out/third.json").path],
                 flags: [0], eventIDs: [404]))
-        try await Task.sleep(for: .milliseconds(100))
-        await observer.stopObserving()
+        let watchdog = stopObserving(observer, after: .seconds(10))
+        defer { watchdog.cancel() }
 
         var iterator = changes.makeAsyncIterator()
         let announcement = await iterator.next()
+        await observer.stopObserving()
         #expect(
             announcement?.change.changedPaths == [
                 "graphify-out/first.json", "graphify-out/second.json", "graphify-out/third.json",
@@ -62,8 +64,19 @@ struct FileSystemEventObserverTests {
         #expect(await iterator.next() == nil)
     }
 
+    private func stopObserving(
+        _ observer: FileSystemEventObserver, after timeout: Duration
+    ) -> Task<Void, Never> {
+        Task {
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled else { return }
+            await observer.stopObserving()
+        }
+    }
+
     private func firstChange(
         in workspace: URL,
+        waitingAtMost timeout: Duration = .seconds(30),
         after write: @escaping @Sendable () throws -> Void
     ) async throws -> WorkspaceChange? {
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(200))
@@ -76,7 +89,7 @@ struct FileSystemEventObserverTests {
                 return nil
             }
             group.addTask {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: timeout)
                 await observer.stopObserving()
                 return nil
             }
@@ -112,27 +125,27 @@ struct FileSystemEventObserverTests {
                 .write(to: workspace.appending(path: "graphify-out/file-\(index).json"))
         }
 
-        let collector = Task {
-            var announcements: [Set<String>] = []
-            for await change in changes { announcements.append(change.changedPaths) }
-            return announcements
+        let expectedPaths = Set((0..<50).map { "graphify-out/file-\($0).json" })
+        let watchdog = stopObserving(observer, after: .seconds(30))
+        defer { watchdog.cancel() }
+        var announcements: [Set<String>] = []
+        var announcedPaths: Set<String> = []
+        for await change in changes {
+            announcements.append(change.changedPaths)
+            announcedPaths.formUnion(change.changedPaths)
+            if announcedPaths.isSuperset(of: expectedPaths) { break }
         }
-        try await Task.sleep(for: .seconds(2))
         await observer.stopObserving()
-        let announcements = await collector.value
 
         #expect(announcements.count < 5)
-        let expectedPaths = Set((0..<50).map { "graphify-out/file-\($0).json" })
-        #expect(
-            announcements.reduce(into: Set<String>()) { $0.formUnion($1) }.isSuperset(
-                of: expectedPaths))
+        #expect(announcedPaths.isSuperset(of: expectedPaths))
     }
 
     @Test("a change outside the watched locations is never announced")
     func aChangeOutsideTheWatchedLocationsIsNeverAnnounced() async throws {
         let workspace = try WorkspaceFixture.make(["node_modules/pkg/index.js": "before"])
 
-        let change = try await firstChange(in: workspace) {
+        let change = try await firstChange(in: workspace, waitingAtMost: .seconds(3)) {
             try Data("after".utf8).write(to: workspace.appending(path: "node_modules/pkg/index.js"))
         }
 

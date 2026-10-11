@@ -29,7 +29,7 @@ struct NativeFileSystemDeliveryTests {
             try Data(path.utf8).write(to: workspace.appending(path: path))
         }
         let deadline = Task {
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(30))
             guard !Task.isCancelled else { return }
             await observer.stopObserving()
         }

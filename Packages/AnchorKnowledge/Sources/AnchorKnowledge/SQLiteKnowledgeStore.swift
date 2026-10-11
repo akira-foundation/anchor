@@ -45,19 +45,20 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
     public func recordEntries(
         _ entries: [KnowledgeEntry], supersedingEntriesFrom source: KnowledgeEntrySource
     ) async throws {
-        try await database.run(
-            """
-            UPDATE knowledge_entries SET state = ? WHERE source = ? AND state = ?;
-            """,
-            [
-                .text(KnowledgeEntryState.superseded.rawValue),
-                .text(try Self.encoded(source)),
-                .text(KnowledgeEntryState.current.rawValue),
-            ]
-        )
-
-        for entry in entries {
-            try await record(entry)
+        let supersededState = KnowledgeEntryState.superseded.rawValue
+        let encodedSource = try Self.encoded(source)
+        let currentState = KnowledgeEntryState.current.rawValue
+        let encodedEntries = try entries.map(Self.encodedParameters)
+        try await database.withinTransaction { isolatedDatabase in
+            try isolatedDatabase.run(
+                """
+                UPDATE knowledge_entries SET state = ? WHERE source = ? AND state = ?;
+                """,
+                [.text(supersededState), .text(encodedSource), .text(currentState)]
+            )
+            for parameters in encodedEntries {
+                try isolatedDatabase.run(Self.insertEntryStatement, parameters)
+            }
         }
     }
 
@@ -129,34 +130,33 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
         return "IS NOT NULL"
     }
 
-    private func record(_ entry: KnowledgeEntry) async throws {
-        try await database.run(
-            """
-            INSERT INTO knowledge_entries (
-                id, project_id, kind, summary_text, source, source_content_hash,
-                origin, supporting_message_ids, state, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                state = excluded.state,
-                summary_text = excluded.summary_text,
-                source_content_hash = excluded.source_content_hash,
-                origin = excluded.origin,
-                supporting_message_ids = excluded.supporting_message_ids;
-            """,
-            [
-                .text(entry.id.rawValue),
-                .text(entry.projectID.rawValue),
-                .text(entry.kind.rawValue),
-                .text(entry.summaryText),
-                .text(try Self.encoded(entry.source)),
-                .text(entry.sourceContentHash.rawValue),
-                .text(entry.origin.rawValue),
-                .text(try Self.encoded(entry.supportingMessageIDs)),
-                .text(entry.state.rawValue),
-                .integer(Int64(entry.createdAt.timeIntervalSince1970)),
-            ]
+    private static let insertEntryStatement = """
+        INSERT INTO knowledge_entries (
+            id, project_id, kind, summary_text, source, source_content_hash,
+            origin, supporting_message_ids, state, created_at
         )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            state = excluded.state,
+            summary_text = excluded.summary_text,
+            source_content_hash = excluded.source_content_hash,
+            origin = excluded.origin,
+            supporting_message_ids = excluded.supporting_message_ids;
+        """
+
+    private static func encodedParameters(_ entry: KnowledgeEntry) throws -> [SQLiteValue] {
+        [
+            .text(entry.id.rawValue),
+            .text(entry.projectID.rawValue),
+            .text(entry.kind.rawValue),
+            .text(entry.summaryText),
+            .text(try Self.encoded(entry.source)),
+            .text(entry.sourceContentHash.rawValue),
+            .text(entry.origin.rawValue),
+            .text(try Self.encoded(entry.supportingMessageIDs)),
+            .text(entry.state.rawValue),
+            .integer(Int64(entry.createdAt.timeIntervalSince1970)),
+        ]
     }
 
     private static func encoded(_ source: KnowledgeEntrySource) throws -> String {

@@ -20,8 +20,9 @@ struct NativeFileSystemDeliveryTests {
             },
             currentEventID: { FSEventsGetCurrentEventId() })
         let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
-        let watchdog = scheduleObserverStop(observer, after: .seconds(30))
-        defer { watchdog.cancel() }
+        let stopGuard = scheduleObserverStop(
+            observer, after: .seconds(30), onTimeout: { captures.continuation.finish() })
+        defer { stopGuard.release() }
         var captureIterator = captures.stream.makeAsyncIterator()
         await captureIterator.next()
         await captureIterator.next()

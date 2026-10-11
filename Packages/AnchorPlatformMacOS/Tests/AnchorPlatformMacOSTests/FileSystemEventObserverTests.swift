@@ -12,8 +12,8 @@ struct FileSystemEventObserverTests {
         defer { try? FileManager.default.removeItem(at: workspace) }
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(20))
         let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
-        let watchdog = scheduleObserverStop(observer, after: .seconds(10))
-        defer { watchdog.cancel() }
+        let stopGuard = scheduleObserverStop(observer, after: .seconds(10))
+        defer { stopGuard.release() }
         await observer.receiveEvents(
             NativeFileSystemEventBatch(
                 paths: [workspace.appending(path: "graphify-out/first.json").path],
@@ -41,8 +41,8 @@ struct FileSystemEventObserverTests {
         defer { try? FileManager.default.removeItem(at: workspace) }
         let observer = FileSystemEventObserver(silenceWindow: .seconds(1))
         let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
-        let watchdog = scheduleObserverStop(observer, after: .seconds(10))
-        defer { watchdog.cancel() }
+        let stopGuard = scheduleObserverStop(observer, after: .seconds(10))
+        defer { stopGuard.release() }
         await observer.receiveEvents(
             NativeFileSystemEventBatch(
                 paths: ["graphify-out/first.json", "graphify-out/second.json"].map {
@@ -71,8 +71,8 @@ struct FileSystemEventObserverTests {
     ) async throws -> WorkspaceChange? {
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(200))
         let changes = try await observer.startWorkspaceObservation(at: workspace)
-        let watchdog = scheduleObserverStop(observer, after: timeout)
-        defer { watchdog.cancel() }
+        let stopGuard = scheduleObserverStop(observer, after: timeout)
+        defer { stopGuard.release() }
         try write()
 
         var announced: WorkspaceChange?
@@ -104,8 +104,8 @@ struct FileSystemEventObserverTests {
         defer { try? FileManager.default.removeItem(at: workspace) }
         let observer = FileSystemEventObserver(silenceWindow: .milliseconds(250))
         let changes = try await observer.startWorkspaceObservation(at: workspace)
-        let watchdog = scheduleObserverStop(observer, after: .seconds(30))
-        defer { watchdog.cancel() }
+        let stopGuard = scheduleObserverStop(observer, after: .seconds(30))
+        defer { stopGuard.release() }
         for index in 0..<50 {
             try Data("burst \(index)".utf8)
                 .write(to: workspace.appending(path: "graphify-out/file-\(index).json"))

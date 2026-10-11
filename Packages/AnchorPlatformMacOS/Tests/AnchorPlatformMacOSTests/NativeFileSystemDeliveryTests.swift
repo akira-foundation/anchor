@@ -20,6 +20,8 @@ struct NativeFileSystemDeliveryTests {
             },
             currentEventID: { FSEventsGetCurrentEventId() })
         let changes = try await observer.startCheckpointedWorkspaceObservation(at: workspace)
+        let watchdog = scheduleObserverStop(observer, after: .seconds(30))
+        defer { watchdog.cancel() }
         var captureIterator = captures.stream.makeAsyncIterator()
         await captureIterator.next()
         await captureIterator.next()
@@ -28,17 +30,11 @@ struct NativeFileSystemDeliveryTests {
         for path in expectedPaths {
             try Data(path.utf8).write(to: workspace.appending(path: path))
         }
-        let deadline = Task {
-            try? await Task.sleep(for: .seconds(30))
-            guard !Task.isCancelled else { return }
-            await observer.stopObserving()
-        }
         var announcedPaths: Set<String> = []
         for await announcement in changes {
             announcedPaths.formUnion(announcement.change.changedPaths)
             if announcedPaths.isSuperset(of: expectedPaths) { break }
         }
-        deadline.cancel()
         await observer.stopObserving()
 
         #expect(announcedPaths.isSuperset(of: expectedPaths))

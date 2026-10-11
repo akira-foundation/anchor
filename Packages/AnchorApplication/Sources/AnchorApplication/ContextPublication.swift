@@ -82,14 +82,16 @@ public struct PublishableProjectContext: Sendable, Hashable {
     public let project: PublishedProjectDescriptor
     public let artifacts: [Artifact]
     public let knowledgeEntries: [KnowledgeEntry]
+    public let knowledgeSources: [KnowledgeEntrySource]
 
     public init(
         project: PublishedProjectDescriptor, artifacts: [Artifact],
-        knowledgeEntries: [KnowledgeEntry]
+        knowledgeEntries: [KnowledgeEntry], knowledgeSources: [KnowledgeEntrySource]
     ) {
         self.project = project
         self.artifacts = artifacts
         self.knowledgeEntries = knowledgeEntries
+        self.knowledgeSources = knowledgeSources
     }
 }
 

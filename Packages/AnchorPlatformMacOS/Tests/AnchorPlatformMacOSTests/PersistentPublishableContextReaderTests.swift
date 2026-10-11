@@ -15,7 +15,7 @@ struct PersistentPublishableContextReaderTests {
     private let workspaceURL = URL(filePath: "/Users/dev/anchor")
     private let projectID = ProjectID()
 
-    @Test("reads the project, its artifacts and all of its knowledge")
+    @Test("reads the project, its artifacts, its current knowledge and every knowledge source")
     func readsProjectArtifactsAndKnowledge() async throws {
         let database = try SQLiteDatabase(fileURL: nil)
         let artifacts = try await SQLiteArtifactContextStore(database: database)
@@ -42,6 +42,13 @@ struct PersistentPublishableContextReaderTests {
             source: source, sourceContentHash: .digest(of: Data("s".utf8)),
             createdAt: Date(timeIntervalSince1970: 20))
         try await knowledge.recordEntries([entry], supersedingEntriesFrom: source)
+        let retiredSource = KnowledgeEntrySource.artifact(artifact.id)
+        let retired = KnowledgeEntry(
+            id: KnowledgeEntryID(), projectID: projectID, kind: .decision, summaryText: "Old",
+            source: retiredSource, sourceContentHash: .digest(of: Data("old".utf8)),
+            createdAt: Date(timeIntervalSince1970: 5))
+        try await knowledge.recordEntries([retired], supersedingEntriesFrom: retiredSource)
+        try await knowledge.recordEntries([], supersedingEntriesFrom: retiredSource)
 
         let context = try #require(
             try await PersistentPublishableContextReader(database: database)
@@ -50,6 +57,7 @@ struct PersistentPublishableContextReaderTests {
         #expect(context.project.displayName == "Anchor")
         #expect(context.artifacts == [artifact])
         #expect(context.knowledgeEntries.map(\.id) == [entry.id])
+        #expect(context.knowledgeSources == [retiredSource, source])
     }
 
     @Test("an unknown workspace yields no context")

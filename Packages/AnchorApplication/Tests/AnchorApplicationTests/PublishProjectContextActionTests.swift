@@ -17,7 +17,8 @@ struct PublishProjectContextActionTests {
         let publisher = RecordingContextPublisher()
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [artifact], knowledgeEntries: [entry]),
+                project: descriptor, artifacts: [artifact], knowledgeEntries: [entry],
+                knowledgeSources: [sessionSource]),
             publisher: publisher)
 
         let report = try await action.perform(
@@ -37,7 +38,8 @@ struct PublishProjectContextActionTests {
         let publisher = RecordingContextPublisher()
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [], knowledgeEntries: [superseded, current]),
+                project: descriptor, artifacts: [], knowledgeEntries: [superseded, current],
+                knowledgeSources: [source]),
             publisher: publisher)
 
         _ = try await action.perform(PublishProjectContextRequest(workspaceURL: workspaceURL))
@@ -48,11 +50,11 @@ struct PublishProjectContextActionTests {
     @Test("a source with only superseded entries publishes an empty snapshot")
     func sourceWithOnlySupersededEntriesPublishesEmptySnapshot() async throws {
         let source = KnowledgeEntrySource.artifact(ArtifactID())
-        let superseded = makeEntry(source: source, summary: "Gone", state: .superseded)
         let publisher = RecordingContextPublisher()
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [], knowledgeEntries: [superseded]),
+                project: descriptor, artifacts: [], knowledgeEntries: [],
+                knowledgeSources: [source]),
             publisher: publisher)
 
         _ = try await action.perform(PublishProjectContextRequest(workspaceURL: workspaceURL))
@@ -62,6 +64,26 @@ struct PublishProjectContextActionTests {
         #expect(snapshots.first?.entries == [])
     }
 
+    @Test("snapshots follow the order of the listed sources")
+    func snapshotsFollowListedSourceOrder() async throws {
+        let first = KnowledgeEntrySource.session(SessionID())
+        let second = KnowledgeEntrySource.artifact(ArtifactID())
+        let firstEntry = makeEntry(source: first, summary: "First", state: .current)
+        let secondEntry = makeEntry(source: second, summary: "Second", state: .current)
+        let publisher = RecordingContextPublisher()
+        let action = makeAction(
+            context: PublishableProjectContext(
+                project: descriptor, artifacts: [], knowledgeEntries: [secondEntry, firstEntry],
+                knowledgeSources: [first, second]),
+            publisher: publisher)
+
+        _ = try await action.perform(PublishProjectContextRequest(workspaceURL: workspaceURL))
+
+        let snapshots = await publisher.snapshots
+        #expect(snapshots.map(\.source) == [first, second])
+        #expect(snapshots.map(\.entries) == [[firstEntry], [secondEntry]])
+    }
+
     @Test("one failed publication does not stop the others")
     func oneFailedPublicationDoesNotStopTheOthers() async throws {
         let first = try #require(makeArtifact(name: "first.md"))
@@ -69,7 +91,8 @@ struct PublishProjectContextActionTests {
         let publisher = RecordingContextPublisher(failingArtifactName: "first.md")
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [first, second], knowledgeEntries: []),
+                project: descriptor, artifacts: [first, second], knowledgeEntries: [],
+                knowledgeSources: []),
             publisher: publisher)
 
         let report = try await action.perform(
@@ -87,7 +110,8 @@ struct PublishProjectContextActionTests {
         let publisher = RecordingContextPublisher(cancellingArtifactName: "first.md")
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [first, second], knowledgeEntries: []),
+                project: descriptor, artifacts: [first, second], knowledgeEntries: [],
+                knowledgeSources: []),
             publisher: publisher)
 
         await #expect(throws: CancellationError.self) {
@@ -102,7 +126,8 @@ struct PublishProjectContextActionTests {
         let publisher = RecordingContextPublisher(cancellingTaskOnProject: true)
         let action = makeAction(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: [artifact], knowledgeEntries: []),
+                project: descriptor, artifacts: [artifact], knowledgeEntries: [],
+                knowledgeSources: []),
             publisher: publisher)
 
         let publication = Task {

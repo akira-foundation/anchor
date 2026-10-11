@@ -91,20 +91,16 @@ public struct PublishProjectContextAction: Action {
         in context: PublishableProjectContext
     ) -> [KnowledgeSourceSnapshot] {
         let projectID = context.project.projectID
-        var orderedSources: [KnowledgeEntrySource] = []
-        var seenSources: Set<KnowledgeEntrySource> = []
-        for entry in context.knowledgeEntries where entry.projectID == projectID {
-            guard seenSources.insert(entry.source).inserted else { continue }
-            orderedSources.append(entry.source)
-        }
+        let currentEntriesBySource = Dictionary(
+            grouping: context.knowledgeEntries.filter {
+                $0.projectID == projectID && $0.state == .current
+            },
+            by: \.source)
 
-        return orderedSources.compactMap { source in
+        return context.knowledgeSources.compactMap { source in
             KnowledgeSourceSnapshot(
-                projectID: projectID,
-                source: source,
-                entries: context.knowledgeEntries.filter {
-                    $0.projectID == projectID && $0.source == source && $0.state == .current
-                })
+                projectID: projectID, source: source,
+                entries: currentEntriesBySource[source] ?? [])
         }
     }
 }

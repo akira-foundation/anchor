@@ -119,6 +119,25 @@ public struct SQLiteKnowledgeStore: KnowledgeStore, KnowledgeContextReading {
         return Date(timeIntervalSince1970: TimeInterval(createdAt))
     }
 
+    public func loadKnowledgeSources(
+        forProject projectID: ProjectID
+    ) async throws -> [KnowledgeEntrySource] {
+        let rows = try await database.run(
+            """
+            SELECT source, MIN(created_at) AS first_created_at FROM knowledge_entries
+            WHERE project_id = ?
+            GROUP BY source
+            ORDER BY first_created_at, source;
+            """,
+            [.text(projectID.rawValue)])
+
+        return try rows.map { row in
+            guard let source = row["source"]?.text.flatMap(Self.decodedSource(from:))
+            else { throw SQLiteKnowledgeStoreFailure.malformedEntryRecord }
+            return source
+        }
+    }
+
     private static func stateFilter(_ includingSuperseded: Bool) -> String {
         guard includingSuperseded else { return "= '\(KnowledgeEntryState.current.rawValue)'" }
 

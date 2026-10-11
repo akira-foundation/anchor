@@ -26,6 +26,8 @@ public struct PersistentPublishableContextReader: PublishableProjectContextReadi
                 canonicalRepositoryRemote: project.canonicalRepositoryRemote),
             artifacts: try await artifacts.loadArtifacts(forProject: project.projectID),
             knowledgeEntries: try await knowledge.entries(
-                forProject: project.projectID, includingSuperseded: true))
+                forProject: project.projectID, includingSuperseded: false),
+            knowledgeSources: try await knowledge.loadKnowledgeSources(
+                forProject: project.projectID))
     }
 }

@@ -125,7 +125,8 @@ func makePublicationCoordinator(
     let publication = PublishProjectContextAction(
         reader: FixedPublishableContextReader(
             context: PublishableProjectContext(
-                project: descriptor, artifacts: artifacts, knowledgeEntries: [])),
+                project: descriptor, artifacts: artifacts, knowledgeEntries: [],
+                knowledgeSources: [])),
         projects: publisher, artifacts: publisher, knowledge: publisher)
 
     return WorkspaceObservationCoordinatorTests().makeCoordinator(
